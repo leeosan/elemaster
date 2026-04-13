@@ -1,7 +1,8 @@
 ﻿"use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
+import Image from "next/image"
 
 export default function CBTStartPage() {
   const searchParams = useSearchParams()
@@ -127,7 +128,6 @@ export default function CBTStartPage() {
             제출
           </button>
         </div>
-        {/* 진행바 */}
         <div className="max-w-2xl mx-auto mt-2 bg-gray-200 rounded-full h-1.5">
           <div
             className="bg-blue-600 h-1.5 rounded-full transition-all"
@@ -140,9 +140,20 @@ export default function CBTStartPage() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow p-6 mb-4">
           <p className="text-xs text-gray-400 mb-2">{q.subject} · {q.year}년 {q.round}회</p>
-          <p className="text-base font-medium text-gray-800 leading-relaxed">
+          <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">
             {q.question_number}. {q.question_text}
           </p>
+          {/* 이미지 표시 */}
+          {q.image_url && (
+            <div className="mt-3 mb-2 flex justify-center">
+              <img
+                src={q.image_url}
+                alt="문제 이미지"
+                className="max-w-full rounded-lg border border-gray-200"
+                style={{ maxHeight: "250px" }}
+              />
+            </div>
+          )}
         </div>
 
         {/* 보기 */}
