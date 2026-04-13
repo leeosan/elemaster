@@ -5,8 +5,11 @@
         <h1 className="text-4xl font-bold text-blue-600 mb-4">
           ⚡ EleMaster
         </h1>
-        <p className="text-xl text-gray-600 mb-8">
-          전기기능장 합격의 지름길
+        <p className="text-xl text-gray-600 mb-2">
+          전기 자격증 합격의 지름길
+        </p>
+        <p className="text-sm text-gray-400 mb-8">
+          전기기능장 · 전기기사 · 전기기능사 · 소방기사
         </p>
         <div className="grid grid-cols-2 gap-4 mt-12">
           <div className="bg-white rounded-xl p-6 shadow">
