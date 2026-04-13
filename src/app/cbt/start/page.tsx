@@ -1,5 +1,5 @@
 ﻿"use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
 
@@ -111,7 +111,6 @@ export default function CBTStartPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 상단 바 */}
       <div className="bg-white shadow-sm sticky top-0 z-10 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <span className="text-sm font-semibold text-gray-600">
@@ -127,7 +126,6 @@ export default function CBTStartPage() {
             제출
           </button>
         </div>
-        {/* 진행바 */}
         <div className="max-w-2xl mx-auto mt-2 bg-gray-200 rounded-full h-1.5">
           <div
             className="bg-blue-600 h-1.5 rounded-full transition-all"
@@ -136,16 +134,24 @@ export default function CBTStartPage() {
         </div>
       </div>
 
-      {/* 문제 */}
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow p-6 mb-4">
-          <p className="text-xs text-gray-400 mb-2">{q.subject} · {q.year}년 {q.round}회</p>
-          <p className="text-base font-medium text-gray-800 leading-relaxed">
+          <p className="text-xs text-gray-400 mb-2">{q.subject} · {q.year}년 {q.round}회 · 출처: 한국산업인력공단</p>
+          <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">
             {q.question_number}. {q.question_text}
           </p>
+          {q.image_url && (
+            <div className="mt-3 mb-2 flex justify-center">
+              <img
+                src={q.image_url}
+                alt="문제 이미지"
+                className="max-w-full rounded-lg border border-gray-200"
+                style={{ maxHeight: "250px" }}
+              />
+            </div>
+          )}
         </div>
 
-        {/* 보기 */}
         <div className="flex flex-col gap-3 mb-4">
           {[1, 2, 3, 4].map(num => (
             <button
@@ -162,7 +168,6 @@ export default function CBTStartPage() {
           ))}
         </div>
 
-        {/* 해설 */}
         {answers[current] && (
           <button
             onClick={() => setShowExplanation(!showExplanation)}
@@ -178,7 +183,6 @@ export default function CBTStartPage() {
           </div>
         )}
 
-        {/* 이전/다음 버튼 */}
         <div className="flex gap-3">
           <button
             onClick={() => { setCurrent(c => c - 1); setShowExplanation(false) }}
