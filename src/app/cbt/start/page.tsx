@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
-import Image from "next/image"
 
 export default function CBTStartPage() {
   const searchParams = useSearchParams()
@@ -32,7 +31,7 @@ export default function CBTStartPage() {
 
     query.limit(60).then(({ data }) => {
       const sorted = year && round
-        ? (data || []).sort((a, b) => a.question_number - b.question_number)
+        ? (data || []).sort((a: any, b: any) => a.question_number - b.question_number)
         : (data || []).sort(() => Math.random() - 0.5)
       setQuestions(sorted)
       setLoading(false)
@@ -145,18 +144,10 @@ export default function CBTStartPage() {
 
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow p-6 mb-4">
-<<<<<<< HEAD
-          <p className="text-xs text-gray-400 mb-2">{q.subject} · {q.year}년 {q.round}회 · 출처: 한국산업인력공단</p>
-          <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">
-            {q.question_number}. {q.question_text}
-          </p>
-=======
           <p className="text-xs text-gray-400 mb-2">{q.subject} · {q.year}년 {q.round}회</p>
           <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">
             {q.question_number}. {q.question_text}
           </p>
-          {/* 이미지 표시 */}
->>>>>>> 5d9e46d (과년도 풀기 페이지 추가)
           {q.image_url && (
             <div className="mt-3 mb-2 flex justify-center">
               <img
