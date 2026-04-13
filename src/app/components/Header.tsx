@@ -1,9 +1,27 @@
 ﻿"use client"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push("/")
+  }
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -21,12 +39,28 @@ export default function Header() {
           <Link href="/calculator" className="hover:text-blue-600">공학용계산기</Link>
         </nav>
 
-        {/* 로그인 버튼 */}
+        {/* 로그인/로그아웃 버튼 */}
         <div className="hidden md:flex items-center gap-2">
-          <Link href="/login" className="text-sm text-gray-600 hover:text-blue-600">로그인</Link>
-          <Link href="/signup" className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-            회원가입
-          </Link>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">
+                {user.user_metadata?.name || user.email?.split("@")[0]}님
+              </span>
+              <button
+                onClick={handleLogout}
+                className="text-sm bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200"
+              >
+                로그아웃
+              </button>
+            </div>
+          ) : (
+            <>
+              <Link href="/login" className="text-sm text-gray-600 hover:text-blue-600">로그인</Link>
+              <Link href="/signup" className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                회원가입
+              </Link>
+            </>
+          )}
         </div>
 
         {/* 모바일 햄버거 */}
@@ -47,8 +81,17 @@ export default function Header() {
           <Link href="/info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
           <Link href="/calculator" onClick={() => setMenuOpen(false)}>📱 공학용계산기</Link>
           <hr />
-          <Link href="/login" onClick={() => setMenuOpen(false)}>로그인</Link>
-          <Link href="/signup" onClick={() => setMenuOpen(false)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-center">회원가입</Link>
+          {user ? (
+            <>
+              <span className="text-gray-600">{user.user_metadata?.name || user.email?.split("@")[0]}님</span>
+              <button onClick={handleLogout} className="text-left text-red-500">로그아웃</button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" onClick={() => setMenuOpen(false)}>로그인</Link>
+              <Link href="/signup" onClick={() => setMenuOpen(false)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-center">회원가입</Link>
+            </>
+          )}
         </div>
       )}
     </header>
