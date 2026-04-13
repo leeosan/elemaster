@@ -1,9 +1,9 @@
 ﻿"use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
 
-export default function CBTStartPage() {
+function CBTStartInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const examId = searchParams.get("exam") || "1"
@@ -209,5 +209,13 @@ export default function CBTStartPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CBTStartPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-400">로딩 중...</p></div>}>
+      <CBTStartInner />
+    </Suspense>
   )
 }
