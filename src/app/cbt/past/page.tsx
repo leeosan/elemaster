@@ -1,15 +1,15 @@
-﻿"use client"
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
+﻿"use client";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 export default function CBTPastPage() {
-  const router = useRouter()
-  const [exams, setExams] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const [exams, setExams] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createClient();
     supabase
       .from("questions")
       .select("year, round")
@@ -18,24 +18,26 @@ export default function CBTPastPage() {
       .order("round", { ascending: false })
       .then(({ data }) => {
         const unique = Array.from(
-          new Map((data || []).map(q => [`${q.year}-${q.round}`, q])).values()
-        )
-        setExams(unique)
-        setLoading(false)
-      })
-  }, [])
+          new Map((data || []).map((q: any) => [`${q.year}-${q.round}`, q])).values()
+        );
+        setExams(unique);
+        setLoading(false);
+      });
+  }, []);
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400">불러오는 중...</p>
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-400">불러오는 중...</p>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">📚 과년도 문제</h1>
+          <button onClick={() => router.back()} className="text-gray-500 text-sm mb-3 hover:text-gray-700">← 뒤로</button>
+          <h1 className="text-2xl font-bold text-gray-800">과년도 기출문제</h1>
           <p className="text-gray-500 text-sm mt-1">전기기능장 과년도 기출문제</p>
         </div>
         <div className="grid gap-3">
@@ -48,7 +50,7 @@ export default function CBTPastPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-gray-800">
-                    전기기능장 {exam.year}년 {exam.round}회
+                    전기기능장 {exam.year}년 제{exam.round}회
                   </p>
                   <p className="text-sm text-gray-400 mt-0.5">60문제 · 60분</p>
                 </div>
@@ -59,5 +61,5 @@ export default function CBTPastPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
