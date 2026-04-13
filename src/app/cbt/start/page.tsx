@@ -7,6 +7,8 @@ export default function CBTStartPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const examId = searchParams.get("exam") || "1"
+  const year = searchParams.get("year")
+  const round = searchParams.get("round")
 
   const [questions, setQuestions] = useState<any[]>([])
   const [current, setCurrent] = useState(0)
@@ -18,17 +20,23 @@ export default function CBTStartPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
+    let query = supabase
       .from("questions")
       .select("*")
       .eq("exam_type_id", examId)
-      .limit(60)
-      .then(({ data }) => {
-        const shuffled = (data || []).sort(() => Math.random() - 0.5)
-        setQuestions(shuffled)
-        setLoading(false)
-      })
-  }, [examId])
+
+    if (year && round) {
+      query = query.eq("year", year).eq("round", round)
+    }
+
+    query.limit(60).then(({ data }) => {
+      const sorted = year && round
+        ? (data || []).sort((a, b) => a.question_number - b.question_number)
+        : (data || []).sort(() => Math.random() - 0.5)
+      setQuestions(sorted)
+      setLoading(false)
+    })
+  }, [examId, year, round])
 
   useEffect(() => {
     if (finished || loading) return
@@ -96,10 +104,10 @@ export default function CBTStartPage() {
               다시 풀기
             </button>
             <button
-              onClick={() => router.push("/cbt")}
+              onClick={() => router.back()}
               className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-lg font-semibold hover:bg-gray-50"
             >
-              종목 선택
+              목록으로
             </button>
           </div>
         </div>
