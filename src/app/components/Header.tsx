@@ -41,6 +41,7 @@ export default function Header() {
           <Link href="/mypage" className="hover:text-blue-600">나의 학습</Link>
           <Link href="/exam-info" className="hover:text-blue-600">시험정보</Link>
           <Link href="/calculator" className="hover:text-blue-600">공학용계산기</Link>
+          <Link href="/community" className="hover:text-blue-600">커뮤니티</Link>
           {isAdmin && (
             <Link href="/admin" className="hover:text-red-600 text-red-500 font-bold">🛠 관리자</Link>
           )}
@@ -87,6 +88,7 @@ export default function Header() {
           <Link href="/mypage" onClick={() => setMenuOpen(false)}>📊 나의 학습</Link>
           <Link href="/exam-info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
           <Link href="/calculator" onClick={() => setMenuOpen(false)}>📱 공학용계산기</Link>
+          <Link href="/community" onClick={() => setMenuOpen(false)}>💬 커뮤니티</Link>
           {isAdmin && (
             <Link href="/admin" onClick={() => setMenuOpen(false)} className="text-red-500 font-bold">🛠 관리자</Link>
           )}

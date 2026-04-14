@@ -35,7 +35,13 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* 후원 섹션 */}
+        <Link href="/community" className="bg-white rounded-xl p-6 shadow hover:shadow-md hover:border-blue-300 border border-transparent transition-all col-span-2">
+            <div className="text-3xl mb-2">💬</div>
+            <h2 className="font-bold text-lg">커뮤니티</h2>
+            <p className="text-gray-500 text-sm mt-1">자유게시판 / 질문답변 / 합격후기</p>
+          </Link>
+
+          {/* 후원 섹션 */}
         <div className="mt-16 bg-white rounded-2xl shadow p-6 text-center border border-yellow-100">
           <p className="text-lg mb-1">☕ 개발자 응원하기</p>
           <p className="text-sm text-gray-400 mb-4">무료 서비스 유지에 큰 힘이 됩니다 🙏</p>
