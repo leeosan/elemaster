@@ -1,12 +1,13 @@
-"use client"
-import { useState, useEffect } from "react"
+﻿"use client"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
 export default function CommunityWritePage() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [category, setCategory] = useState("free")
+  const [category: categoryRef.current, setCategory] = useState("free")
+  const categoryRef = useRef("free")
   const [user, setUser] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -25,7 +26,7 @@ export default function CommunityWritePage() {
     const supabase = createClient()
     const { data, error } = await supabase.from("posts").insert({
       user_id: user.id,
-      category,
+      category: categoryRef.current,
       title: title.trim(),
       content: content.trim()
     }).select().single()
@@ -49,7 +50,7 @@ export default function CommunityWritePage() {
               { key: "qna", label: "❓ 질문/답변" },
               { key: "pass", label: "🏆 합격후기" },
             ].map(c => (
-              <button key={c.key} onClick={() => setCategory(c.key)}
+              <button key={c.key} onClick={() => setCategory(c.key); categoryRef.current = c.key}
                 className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all
                   ${category === c.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                 {c.label}
