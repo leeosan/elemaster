@@ -17,6 +17,7 @@ function CBTStartInner() {
   const [loading, setLoading] = useState(true)
   const [finished, setFinished] = useState(false)
   const [showExplanation, setShowExplanation] = useState(false)
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -88,27 +89,99 @@ function CBTStartInner() {
     const { correct, total, score } = getScore()
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-10">
-        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow p-8 text-center">
-          <div className="text-5xl mb-4">{score >= 60 ? "🎉" : "😅"}</div>
-          <h1 className="text-2xl font-bold mb-2">{score >= 60 ? "합격!" : "불합격"}</h1>
-          <p className="text-gray-500 mb-6">합격 기준: 60점 이상</p>
-          <div className="bg-gray-50 rounded-xl p-6 mb-6">
-            <p className="text-4xl font-bold text-blue-600 mb-2">{score}점</p>
-            <p className="text-gray-500">{total}문제 중 {correct}문제 정답</p>
+        <div className="max-w-2xl mx-auto">
+          {/* 점수 카드 */}
+          <div className="bg-white rounded-2xl shadow p-8 text-center mb-6">
+            <div className="text-5xl mb-4">{score >= 60 ? "🎉" : "😅"}</div>
+            <h1 className="text-2xl font-bold mb-2">{score >= 60 ? "합격!" : "불합격"}</h1>
+            <p className="text-gray-500 mb-6">합격 기준: 60점 이상</p>
+            <div className="bg-gray-50 rounded-xl p-6 mb-6">
+              <p className="text-4xl font-bold text-blue-600 mb-2">{score}점</p>
+              <p className="text-gray-500">{total}문제 중 {correct}문제 정답</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setFinished(false); setAnswers({}); setCurrent(0); setTimeLeft(3600); setShowExplanation(false); setReviewIndex(null) }}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+              >
+                다시 풀기
+              </button>
+              <button
+                onClick={() => router.back()}
+                className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-lg font-semibold hover:bg-gray-50"
+              >
+                목록으로
+              </button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => { setFinished(false); setAnswers({}); setCurrent(0); setTimeLeft(3600); setShowExplanation(false) }}
-              className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
-            >
-              다시 풀기
-            </button>
-            <button
-              onClick={() => router.back()}
-              className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-lg font-semibold hover:bg-gray-50"
-            >
-              목록으로
-            </button>
+
+          {/* 문제별 정답 목록 */}
+          <div className="bg-white rounded-2xl shadow overflow-hidden">
+            <div className="px-6 py-4 border-b">
+              <h2 className="font-bold text-gray-800">📋 문제별 정답 확인</h2>
+            </div>
+            <div className="divide-y">
+              {questions.map((q, i) => {
+                const myAnswer = answers[i]
+                const isCorrect = myAnswer === q.answer
+                const isOpen = reviewIndex === i
+                return (
+                  <div key={i} className={`${isCorrect ? "bg-white" : "bg-red-50"}`}>
+                    <button
+                      onClick={() => setReviewIndex(isOpen ? null : i)}
+                      className="w-full text-left px-6 py-4 flex items-center gap-3"
+                    >
+                      <span className={`text-lg ${isCorrect ? "text-green-500" : "text-red-500"}`}>
+                        {isCorrect ? "⭕" : "❌"}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-700 truncate">
+                          <span className="text-gray-400 mr-1">{i + 1}.</span>
+                          {q.question_text}
+                        </p>
+                        <div className="flex gap-3 mt-1 text-xs">
+                          <span className={`${myAnswer ? (isCorrect ? "text-green-600" : "text-red-500") : "text-gray-400"}`}>
+                            내 답: {myAnswer ? `${myAnswer}번` : "미응답"}
+                          </span>
+                          {!isCorrect && (
+                            <span className="text-blue-600 font-semibold">정답: {q.answer}번</span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
+                    </button>
+
+                    {/* 펼치면 보기 + 해설 */}
+                    {isOpen && (
+                      <div className="px-6 pb-4">
+                        <div className="flex flex-col gap-2 mb-3">
+                          {[1, 2, 3, 4].map(num => (
+                            <div
+                              key={num}
+                              className={`px-4 py-3 rounded-xl border-2 text-sm
+                                ${num === q.answer ? "border-green-500 bg-green-50 text-green-700 font-semibold" : ""}
+                                ${num === myAnswer && num !== q.answer ? "border-red-400 bg-red-50 text-red-600" : ""}
+                                ${num !== q.answer && num !== myAnswer ? "border-gray-200 text-gray-600" : ""}
+                              `}
+                            >
+                              {num === q.answer && <span className="mr-1">✅</span>}
+                              {num === myAnswer && num !== q.answer && <span className="mr-1">❌</span>}
+                              {num}. {q[`option_${num}`]}
+                            </div>
+                          ))}
+                        </div>
+                        {q.explanation && (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-gray-700">
+                            <p className="font-semibold text-yellow-700 mb-1">📖 해설</p>
+                            <p>{q.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -143,7 +216,6 @@ function CBTStartInner() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6">
-
         {/* 출제기준 변경 경고 */}
         {q.is_deprecated && (
           <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-3 flex items-start gap-2">
@@ -158,7 +230,6 @@ function CBTStartInner() {
         <div className="bg-white rounded-xl shadow p-6 mb-4">
           <div className="flex flex-wrap gap-2 mb-3">
             <p className="text-xs text-gray-400">{q.subject} · {q.year}년 {q.round}회</p>
-            {/* 중요도 뱃지 */}
             {q.importance === "필수" && (
               <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>
             )}
@@ -166,12 +237,9 @@ function CBTStartInner() {
               <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>
             )}
           </div>
-
           <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">
             {q.question_number}. {q.question_text}
           </p>
-
-          {/* 중복 출제 뱃지 */}
           {q.duplicate_cnt >= 2 && (
             <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
               <span className="text-blue-500 text-sm">🔁</span>
@@ -181,15 +249,9 @@ function CBTStartInner() {
               </div>
             </div>
           )}
-
           {q.image_url && (
             <div className="mt-3 mb-2 flex justify-center">
-              <img
-                src={q.image_url}
-                alt="문제 이미지"
-                className="max-w-full rounded-lg border border-gray-200"
-                style={{ maxHeight: "250px" }}
-              />
+              <img src={q.image_url} alt="문제 이미지" className="max-w-full rounded-lg border border-gray-200" style={{ maxHeight: "250px" }} />
             </div>
           )}
         </div>
