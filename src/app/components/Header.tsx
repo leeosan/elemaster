@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
+const ADMIN_EMAIL = "jaetech01@gmail.com"
+
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
@@ -23,6 +25,8 @@ export default function Header() {
     router.push("/")
   }
 
+  const isAdmin = user?.email === ADMIN_EMAIL
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -32,11 +36,15 @@ export default function Header() {
 
         {/* 데스크탑 메뉴 */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-          <Link href="/cbt" className="hover:text-blue-600">필기 CBT</Link>
-          <Link href="/practical" className="hover:text-blue-600">실기</Link>
+          <Link href="/cbt/past?exam=1" className="hover:text-blue-600">필기 CBT</Link>
+          <Link href="/silgi" className="hover:text-blue-600">실기</Link>
           <Link href="/mypage" className="hover:text-blue-600">나의 학습</Link>
-          <Link href="/info" className="hover:text-blue-600">시험정보</Link>
+          <Link href="/exam-info" className="hover:text-blue-600">시험정보</Link>
           <Link href="/calculator" className="hover:text-blue-600">공학용계산기</Link>
+          <Link href="/community" className="hover:text-blue-600">커뮤니티</Link>
+          {isAdmin && (
+            <Link href="/admin" className="hover:text-red-600 text-red-500 font-bold">🛠 관리자</Link>
+          )}
         </nav>
 
         {/* 로그인/로그아웃 버튼 */}
@@ -75,11 +83,15 @@ export default function Header() {
       {/* 모바일 메뉴 */}
       {menuOpen && (
         <div className="md:hidden bg-white border-t px-4 py-3 flex flex-col gap-3 text-sm font-medium text-gray-600">
-          <Link href="/cbt" onClick={() => setMenuOpen(false)}>📝 필기 CBT</Link>
-          <Link href="/practical" onClick={() => setMenuOpen(false)}>🔧 실기</Link>
+          <Link href="/cbt/past?exam=1" onClick={() => setMenuOpen(false)}>📝 필기 CBT</Link>
+          <Link href="/silgi" onClick={() => setMenuOpen(false)}>🔧 실기</Link>
           <Link href="/mypage" onClick={() => setMenuOpen(false)}>📊 나의 학습</Link>
-          <Link href="/info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
+          <Link href="/exam-info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
           <Link href="/calculator" onClick={() => setMenuOpen(false)}>📱 공학용계산기</Link>
+          <Link href="/community" onClick={() => setMenuOpen(false)}>💬 커뮤니티</Link>
+          {isAdmin && (
+            <Link href="/admin" onClick={() => setMenuOpen(false)} className="text-red-500 font-bold">🛠 관리자</Link>
+          )}
           <hr />
           {user ? (
             <>
