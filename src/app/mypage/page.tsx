@@ -9,6 +9,8 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true)
   const [reviewIndex, setReviewIndex] = useState<number | null>(null)
   const [stats, setStats] = useState({ total: 0, thisWeek: 0, subjects: {} as any })
+  const [aiAnalysis, setAiAnalysis] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -17,26 +19,21 @@ export default function MyPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace("/login"); return }
       setUser(user)
-
       const { data } = await supabase
         .from("wrong_answers")
         .select("*, questions(*)")
         .eq("user_id", user.id)
         .order("solved_at", { ascending: false })
-
       setWrongAnswers(data || [])
-
       const thisWeek = (data || []).filter(w => {
         const diff = Date.now() - new Date(w.solved_at).getTime()
         return diff < 7 * 24 * 60 * 60 * 1000
       }).length
-
       const subjects: any = {}
       ;(data || []).forEach(w => {
         const s = w.questions?.subject || "기타"
         subjects[s] = (subjects[s] || 0) + 1
       })
-
       setStats({ total: (data || []).length, thisWeek, subjects })
       setLoading(false)
     }
@@ -48,6 +45,27 @@ export default function MyPage() {
     await supabase.from("wrong_answers").delete().eq("id", id)
     setWrongAnswers(prev => prev.filter(w => w.id !== id))
     setStats(prev => ({ ...prev, total: prev.total - 1 }))
+  }
+
+  const getAiAnalysis = async () => {
+    if (wrongAnswers.length === 0) return
+    setAiLoading(true)
+    setAiAnalysis("")
+    const questions = wrongAnswers.map(w => w.questions).filter(Boolean)
+    const answers: any = {}
+    wrongAnswers.forEach((w, i) => { answers[i] = w.my_answer })
+    try {
+      const res = await fetch("/api/ai-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questions, answers, mode: "wrongOnly" })
+      })
+      const data = await res.json()
+      setAiAnalysis(data.result || "분석 실패")
+    } catch {
+      setAiAnalysis("AI 분석 서비스가 일시적으로 중단됐습니다. 잠시 후 다시 시도해주세요.")
+    }
+    setAiLoading(false)
   }
 
   if (loading) return (
@@ -77,6 +95,24 @@ export default function MyPage() {
           </div>
         </div>
 
+        {/* AI 분석 버튼 */}
+        {wrongAnswers.length > 0 && (
+          <div className="mb-6">
+            <button
+              onClick={getAiAnalysis}
+              disabled={aiLoading}
+              className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50"
+            >
+              {aiLoading ? "🤖 AI 분석 중..." : "🤖 내 오답 AI 분석 받기"}
+            </button>
+            {aiAnalysis && (
+              <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-5 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {aiAnalysis}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 과목별 오답 현황 */}
         {Object.keys(stats.subjects).length > 0 && (
           <div className="bg-white rounded-xl shadow p-5 mb-6">
@@ -88,10 +124,7 @@ export default function MyPage() {
                   <div key={subject} className="flex items-center gap-3">
                     <span className="text-xs text-gray-600 w-40 truncate">{subject}</span>
                     <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-red-400 h-2 rounded-full"
-                        style={{ width: `${Math.min((count / stats.total) * 100, 100)}%` }}
-                      />
+                      <div className="bg-red-400 h-2 rounded-full" style={{ width: `${Math.min((count / stats.total) * 100, 100)}%` }} />
                     </div>
                     <span className="text-xs text-gray-500 w-6 text-right">{count}</span>
                   </div>
@@ -113,7 +146,6 @@ export default function MyPage() {
               </button>
             )}
           </div>
-
           {wrongAnswers.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-4xl mb-3">🎉</p>
@@ -129,10 +161,7 @@ export default function MyPage() {
                 const isOpen = reviewIndex === i
                 return (
                   <div key={w.id}>
-                    <button
-                      onClick={() => setReviewIndex(isOpen ? null : i)}
-                      className="w-full text-left px-5 py-4 flex items-center gap-3 hover:bg-gray-50"
-                    >
+                    <button onClick={() => setReviewIndex(isOpen ? null : i)} className="w-full text-left px-5 py-4 flex items-center gap-3 hover:bg-gray-50">
                       <span className="text-red-400 text-lg">❌</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-700 truncate">{q?.question_text}</p>
@@ -144,12 +173,7 @@ export default function MyPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
-                        <button
-                          onClick={e => { e.stopPropagation(); deleteWrong(w.id) }}
-                          className="text-xs text-gray-400 hover:text-red-500 px-1"
-                        >
-                          🗑
-                        </button>
+                        <button onClick={e => { e.stopPropagation(); deleteWrong(w.id) }} className="text-xs text-gray-400 hover:text-red-500 px-1">🗑</button>
                       </div>
                     </button>
                     {isOpen && q && (
