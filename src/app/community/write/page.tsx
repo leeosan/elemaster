@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 export default function CommunityWritePage() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [category: categoryRef.current, setCategory] = useState("free")
+  const [category, setCategory] = useState("free")
   const categoryRef = useRef("free")
   const [user, setUser] = useState<any>(null)
   const [saving, setSaving] = useState(false)
