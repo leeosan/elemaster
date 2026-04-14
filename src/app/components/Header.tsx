@@ -32,10 +32,10 @@ export default function Header() {
 
         {/* 데스크탑 메뉴 */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-          <Link href="/cbt" className="hover:text-blue-600">필기 CBT</Link>
-          <Link href="/practical" className="hover:text-blue-600">실기</Link>
+          <Link href="/cbt/past?exam=1" className="hover:text-blue-600">필기 CBT</Link>
+          <Link href="/silgi" className="hover:text-blue-600">실기</Link>
           <Link href="/mypage" className="hover:text-blue-600">나의 학습</Link>
-          <Link href="/info" className="hover:text-blue-600">시험정보</Link>
+          <Link href="/exam-info" className="hover:text-blue-600">시험정보</Link>
           <Link href="/calculator" className="hover:text-blue-600">공학용계산기</Link>
         </nav>
 
@@ -75,10 +75,10 @@ export default function Header() {
       {/* 모바일 메뉴 */}
       {menuOpen && (
         <div className="md:hidden bg-white border-t px-4 py-3 flex flex-col gap-3 text-sm font-medium text-gray-600">
-          <Link href="/cbt" onClick={() => setMenuOpen(false)}>📝 필기 CBT</Link>
-          <Link href="/practical" onClick={() => setMenuOpen(false)}>🔧 실기</Link>
+          <Link href="/cbt/past?exam=1" onClick={() => setMenuOpen(false)}>📝 필기 CBT</Link>
+          <Link href="/silgi" onClick={() => setMenuOpen(false)}>🔧 실기</Link>
           <Link href="/mypage" onClick={() => setMenuOpen(false)}>📊 나의 학습</Link>
-          <Link href="/info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
+          <Link href="/exam-info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
           <Link href="/calculator" onClick={() => setMenuOpen(false)}>📱 공학용계산기</Link>
           <hr />
           {user ? (
