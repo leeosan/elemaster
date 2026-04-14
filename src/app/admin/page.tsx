@@ -1,17 +1,32 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
+
+const ADMIN_EMAIL = "jaetech01@gmail.com"
 
 export default function AdminPage() {
   const [questions, setQuestions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [authorized, setAuthorized] = useState(false)
   const [saving, setSaving] = useState<number | null>(null)
   const [search, setSearch] = useState("")
   const [filterYear, setFilterYear] = useState("")
   const [years, setYears] = useState<number[]>([])
+  const router = useRouter()
 
   useEffect(() => {
-    fetchQuestions()
+    const checkAuth = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || user.email !== ADMIN_EMAIL) {
+        router.replace("/")
+        return
+      }
+      setAuthorized(true)
+      fetchQuestions()
+    }
+    checkAuth()
   }, [])
 
   const fetchQuestions = async () => {
@@ -42,9 +57,9 @@ export default function AdminPage() {
     return matchSearch && matchYear
   })
 
-  if (loading) return (
+  if (!authorized || loading) return (
     <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400">불러오는 중...</p>
+      <p className="text-gray-400">확인 중...</p>
     </div>
   )
 
