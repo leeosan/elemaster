@@ -35,11 +35,20 @@ export default function AdminPage() {
 
   const fetchQuestions = async () => {
     const supabase = createClient()
-    const { data } = await supabase.from("questions")
-      .select("id, question_number, question_text, year, round, subject, is_deprecated, importance")
-      .order("year", { ascending: false }).order("round").order("question_number").range(0, 9999)
-    setQuestions(data || [])
-    const uniqueYears = [...new Set((data || []).map((q: any) => q.year))].sort((a, b) => b - a)
+    let allData: any[] = []
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase.from("questions")
+        .select("id, question_number, question_text, year, round, subject, is_deprecated, importance")
+        .order("year", { ascending: false }).order("round").order("question_number")
+        .range(from, from + 999)
+      if (error || !data || data.length === 0) break
+      allData = [...allData, ...data]
+      if (data.length < 1000) break
+      from += 1000
+    }
+    setQuestions(allData)
+    const uniqueYears = [...new Set(allData.map((q: any) => q.year))].sort((a, b) => b - a)
     setYears(uniqueYears)
     setLoading(false)
   }
