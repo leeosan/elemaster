@@ -35,7 +35,7 @@ export default function Home() {
           </Link>
         </div>
 
-        <Link href="/community" className="bg-white rounded-xl p-6 shadow hover:shadow-md hover:border-blue-300 border border-transparent transition-all col-span-2">
+        <Link href="/community" className="bg-white rounded-xl p-6 shadow hover:shadow-md hover:border-blue-300 border border-transparent transition-all text-center">
             <div className="text-3xl mb-2">💬</div>
             <h2 className="font-bold text-lg">커뮤니티</h2>
             <p className="text-gray-500 text-sm mt-1">자유게시판 / 질문답변 / 합격후기</p>
