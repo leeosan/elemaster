@@ -18,6 +18,7 @@ function CBTPastInner() {
       .select("year, round")
       .eq("exam_type_id", examTypeId)
       .order("round", { ascending: false })
+      .limit(2000)
       .then(({ data }) => {
         const unique = Array.from(
           new Map((data || []).map((q: any) => [`${q.year}-${q.round}`, q])).values()
@@ -39,7 +40,7 @@ function CBTPastInner() {
         <div className="mb-6">
           <button onClick={() => router.back()} className="text-gray-500 text-sm mb-3 hover:text-gray-700">← 뒤로</button>
           <h1 className="text-2xl font-bold text-gray-800">과년도 기출문제</h1>
-          <p className="text-gray-500 text-sm mt-1">전기기능장 과년도 기출문제</p>
+          <p className="text-gray-500 text-sm mt-1">전기기능장 과년도 기출문제 ({exams.length}회차)</p>
         </div>
         <div className="grid gap-3">
           {exams.map((exam) => (
