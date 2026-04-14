@@ -1,5 +1,5 @@
 ﻿"use client"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
@@ -7,7 +7,6 @@ export default function CommunityWritePage() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [category, setCategory] = useState("free")
-  const categoryRef = useRef("free")
   const [user, setUser] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -20,18 +19,13 @@ export default function CommunityWritePage() {
     })
   }, [])
 
-  const handleCategoryChange = (key: string) => {
-    setCategory(key)
-    categoryRef.current = key
-  }
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (selectedCategory: string) => {
     if (!title.trim() || !content.trim()) return
     setSaving(true)
     const supabase = createClient()
     const { data, error } = await supabase.from("posts").insert({
       user_id: user.id,
-      category: categoryRef.current,
+      category: selectedCategory,
       title: title.trim(),
       content: content.trim()
     }).select().single()
@@ -56,7 +50,7 @@ export default function CommunityWritePage() {
             ].map(c => (
               <button
                 key={c.key}
-                onClick={() => handleCategoryChange(c.key)}
+                onClick={() => setCategory(c.key)}
                 className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all
                   ${category === c.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
@@ -82,11 +76,11 @@ export default function CommunityWritePage() {
           />
 
           <button
-            onClick={handleSubmit}
+            onClick={() => handleSubmit(category)}
             disabled={saving || !title.trim() || !content.trim()}
             className="mt-4 w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-40"
           >
-            {saving ? "등록 중..." : "게시글 등록"}
+            {saving ? "등록 중..." : `${category === "free" ? "💬 자유" : category === "qna" ? "❓ 질문/답변" : "🏆 합격후기"} 게시글 등록`}
           </button>
         </div>
       </div>
