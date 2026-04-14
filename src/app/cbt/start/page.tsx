@@ -68,7 +68,7 @@ function CBTStartInner() {
     const supabase = createClient()
     const { data } = await supabase
       .from("question_notes")
-      .select("*, auth_users:user_id(email)")
+      .select("*")
       .eq("question_id", questionId)
       .order("like_count", { ascending: false })
     setNotes(data || [])
@@ -404,3 +404,4 @@ export default function CBTStartPage() {
     </Suspense>
   )
 }
+
