@@ -27,13 +27,13 @@ export default function Home() {
             <h2 className="font-bold text-lg">시험정보</h2>
             <p className="text-gray-500 text-sm mt-1">일정 / 합격률 / 준비물</p>
           </Link>
-          <Link href="/community" className="col-span-2 bg-white rounded-xl p-6 shadow hover:shadow-md hover:border-blue-300 border border-transparent transition-all">
-            <div className="text-3xl mb-2">💬</div>
-            <h2 className="font-bold text-lg">커뮤니티</h2>
-            <p className="text-gray-500 text-sm mt-1">자유게시판 / 질문답변 / 합격후기</p>
-          </Link>
         </div>
-        <div className="mt-16 bg-white rounded-2xl shadow p-6 text-center border border-yellow-100">
+        <Link href="/community" className="mt-4 block w-full bg-white rounded-xl p-6 shadow hover:shadow-md hover:border-blue-300 border border-transparent transition-all">
+          <div className="text-3xl mb-2">💬</div>
+          <h2 className="font-bold text-lg">커뮤니티</h2>
+          <p className="text-gray-500 text-sm mt-1">자유게시판 / 질문답변 / 합격후기</p>
+        </Link>
+        <div className="mt-4 bg-white rounded-2xl shadow p-6 text-center border border-yellow-100">
           <p className="text-lg mb-1">☕ 개발자 응원하기</p>
           <p className="text-sm text-gray-400 mb-4">무료 서비스 유지에 큰 힘이 됩니다 🙏</p>
           <div className="inline-flex flex-col items-center bg-yellow-50 border border-yellow-200 rounded-xl px-8 py-4 gap-1">
