@@ -50,7 +50,7 @@ export default function AdminPage() {
     setUsersLoading(false)
   }
 
-  const handleTabChange = (t) => {
+  const handleTabChange = (t: string) => {
     setTab(t)
     if (t === "users") fetchUsers()
   }
@@ -221,4 +221,5 @@ export default function AdminPage() {
     </div>
   )
 }
+
 
