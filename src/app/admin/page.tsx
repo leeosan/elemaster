@@ -9,12 +9,12 @@ export default function AdminPage() {
   const [tab, setTab] = useState("questions")
   const [authorized, setAuthorized] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [questions, setQuestions] = useState([])
-  const [saving, setSaving] = useState(null)
+  const [questions, setQuestions] = useState<any[]>([])
+  const [saving, setSaving] = useState<any>(null)
   const [search, setSearch] = useState("")
   const [filterYear, setFilterYear] = useState("")
-  const [years, setYears] = useState([])
-  const [users, setUsers] = useState([])
+  const [years, setYears] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [userSearch, setUserSearch] = useState("")
   const router = useRouter()
@@ -221,3 +221,4 @@ export default function AdminPage() {
     </div>
   )
 }
+
