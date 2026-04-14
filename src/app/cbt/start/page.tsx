@@ -138,6 +138,23 @@ function CBTStartInner() {
     setShowExplanation(false)
   }
 
+  const saveWrongAnswers = async () => {
+    if (!user) return
+    const supabase = createClient()
+    const wrongs = questions
+      .map((q, i) => ({ q, myAnswer: answers[i] }))
+      .filter(({ q, myAnswer }) => myAnswer !== q.answer)
+    for (const { q, myAnswer } of wrongs) {
+      await supabase.from("wrong_answers").upsert({
+        user_id: user.id,
+        question_id: q.id,
+        my_answer: myAnswer || null,
+        correct_answer: q.answer,
+        solved_at: new Date().toISOString()
+      }, { onConflict: "user_id,question_id" })
+    }
+  }
+
   const getScore = () => {
     let correct = 0
     questions.forEach((q, i) => { if (answers[i] === q.answer) correct++ })
@@ -407,5 +424,6 @@ export default function CBTStartPage() {
     </Suspense>
   )
 }
+
 
 
