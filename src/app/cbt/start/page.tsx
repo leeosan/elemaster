@@ -21,8 +21,8 @@ function CBTStartInner() {
   const [aiAnalysis, setAiAnalysis] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
 
-  // 풀이 관련
   const [showNotes, setShowNotes] = useState(false)
   const [notes, setNotes] = useState<any[]>([])
   const [myNote, setMyNote] = useState("")
@@ -32,21 +32,19 @@ function CBTStartInner() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.replace("/login"); return }
       setUser(data.user)
+      // 북마크 불러오기
+      const { data: bData } = await supabase.from("bookmarks").select("question_id").eq("user_id", data.user.id)
+      setBookmarks(new Set((bData || []).map((b: any) => b.question_id)))
     })
   }, [])
 
   useEffect(() => {
     const supabase = createClient()
-    let query = supabase
-      .from("questions_with_meta")
-      .select("*")
-      .eq("exam_type_id", examId)
-    if (year && round) {
-      query = query.eq("year", year).eq("round", round)
-    }
+    let query = supabase.from("questions_with_meta").select("*").eq("exam_type_id", examId)
+    if (year && round) query = query.eq("year", year).eq("round", round)
     query.limit(60).then(({ data }) => {
       const sorted = year && round
         ? (data || []).sort((a: any, b: any) => a.question_number - b.question_number)
@@ -67,36 +65,22 @@ function CBTStartInner() {
     return () => clearInterval(timer)
   }, [finished, loading])
 
-  // 풀이 불러오기
   const fetchNotes = async (questionId: number) => {
     setNotesLoading(true)
     const supabase = createClient()
-    const { data } = await supabase
-      .from("question_notes")
-      .select("*")
-      .eq("question_id", questionId)
-      .order("like_count", { ascending: false })
+    const { data } = await supabase.from("question_notes").select("*").eq("question_id", questionId).order("like_count", { ascending: false })
     setNotes(data || [])
-
-    // 내 풀이 찾기
     if (user) {
       const mine = (data || []).find((n: any) => n.user_id === user.id)
       setMyNote(mine?.content || "")
-
-      // 좋아요 한 것 찾기
-      const { data: likes } = await supabase
-        .from("note_likes")
-        .select("note_id")
-        .eq("user_id", user.id)
+      const { data: likes } = await supabase.from("note_likes").select("note_id").eq("user_id", user.id)
       setLikedNotes(new Set((likes || []).map((l: any) => l.note_id)))
     }
     setNotesLoading(false)
   }
 
   const handleToggleNotes = () => {
-    if (!showNotes && questions[current]) {
-      fetchNotes(questions[current].id)
-    }
+    if (!showNotes && questions[current]) fetchNotes(questions[current].id)
     setShowNotes(v => !v)
   }
 
@@ -105,10 +89,8 @@ function CBTStartInner() {
     setNoteSaving(true)
     const supabase = createClient()
     await supabase.from("question_notes").upsert({
-      user_id: user.id,
-      question_id: questions[current].id,
-      content: myNote.trim(),
-      updated_at: new Date().toISOString()
+      user_id: user.id, question_id: questions[current].id,
+      content: myNote.trim(), updated_at: new Date().toISOString()
     }, { onConflict: "user_id,question_id" })
     await fetchNotes(questions[current].id)
     setNoteSaving(false)
@@ -128,6 +110,69 @@ function CBTStartInner() {
     }
   }
 
+  const toggleBookmark = async (questionId: number) => {
+    if (!user) return
+    const supabase = createClient()
+    if (bookmarks.has(questionId)) {
+      await supabase.from("bookmarks").delete().eq("user_id", user.id).eq("question_id", questionId)
+      setBookmarks(prev => { const s = new Set(prev); s.delete(questionId); return s })
+    } else {
+      await supabase.from("bookmarks").insert({ user_id: user.id, question_id: questionId })
+      setBookmarks(prev => new Set(prev).add(questionId))
+    }
+  }
+
+  const getAiAnalysis = async () => {
+    setAiLoading(true)
+    setAiAnalysis("")
+    const wrongQs = questions.filter((q: any, i: number) => answers[i] !== q.answer)
+    try {
+      const res = await fetch("/api/ai-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questions, answers })
+      })
+      const data = await res.json()
+      setAiAnalysis(data.result || "분석 실패")
+    } catch { setAiAnalysis("AI 분석 서비스가 일시적으로 중단됐습니다. 잠시 후 다시 시도해주세요.") }
+    setAiLoading(false)
+  }
+
+  const saveWrongAnswers = async () => {
+    if (!user) return
+    const supabase = createClient()
+    const wrongs = questions.map((q, i) => ({ q, myAnswer: answers[i] })).filter(({ q, myAnswer }) => myAnswer !== q.answer)
+    for (const { q, myAnswer } of wrongs) {
+      await supabase.from("wrong_answers").upsert({
+        user_id: user.id, question_id: q.id,
+        my_answer: myAnswer || null, correct_answer: q.answer,
+        solved_at: new Date().toISOString()
+      }, { onConflict: "user_id,question_id" })
+    }
+    // 학습 기록 저장 (스트릭용)
+    const { correct } = getScore()
+    await supabase.from("study_logs").upsert({
+      user_id: user.id,
+      studied_at: new Date().toISOString().split("T")[0],
+      score: Math.round((correct / questions.length) * 100),
+      total: questions.length
+    }, { onConflict: "user_id,studied_at" })
+  }
+
+  const getScore = () => {
+    let correct = 0
+    questions.forEach((q, i) => { if (answers[i] === q.answer) correct++ })
+    return { correct, total: questions.length, score: Math.round((correct / questions.length) * 100) }
+  }
+
+  const moveTo = (idx: number) => {
+    setCurrent(idx)
+    setShowExplanation(false)
+    setShowNotes(false)
+    setNotes([])
+    setMyNote("")
+  }
+
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60).toString().padStart(2, "0")
     const s = (sec % 60).toString().padStart(2, "0")
@@ -140,59 +185,7 @@ function CBTStartInner() {
     setShowExplanation(false)
   }
 
-  const getAiAnalysis = async () => {
-    setAiLoading(true)
-    setAiAnalysis("")
-    const wrongQs = questions.filter((q: any, i: number) => answers[i] !== q.answer)
-    const prompt = `당신은 전기기능장 시험 전문 강사입니다. 아래는 수험생이 방금 풀었던 CBT 문제 목록입니다.\n\n[전체 문제]\n${questions.map((q: any, i: number) => `${i+1}. [${q.subject}] ${q.question_text} (정답: ${q.answer}번)`).join("\n")}\n\n[틀린 문제]\n${wrongQs.length === 0 ? "없음" : wrongQs.map((q: any) => `- [${q.subject}] ${q.question_text}`).join("\n")}\n\n다음 형식으로 분석해주세요:\n## 📊 취약 과목 분석\n## 🎯 핵심 출제 포인트\n## 💡 쉽게 암기하는 법\n## 📝 다음 학습 추천`
-    try {
-      const res = await fetch("/api/ai-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questions, answers })
-      })
-      const data = await res.json()
-      setAiAnalysis(data.result || "분석 실패")
-    } catch { setAiAnalysis("AI 분석 서비스가 일시적으로 중단됐습니다. 잠시 후 다시 시도해주세요.") }
-    setAiLoading(false)
-  }
-  const saveWrongAnswers = async () => {
-    if (!user) return
-    const supabase = createClient()
-    const wrongs = questions
-      .map((q, i) => ({ q, myAnswer: answers[i] }))
-      .filter(({ q, myAnswer }) => myAnswer !== q.answer)
-    for (const { q, myAnswer } of wrongs) {
-      await supabase.from("wrong_answers").upsert({
-        user_id: user.id,
-        question_id: q.id,
-        my_answer: myAnswer || null,
-        correct_answer: q.answer,
-        solved_at: new Date().toISOString()
-      }, { onConflict: "user_id,question_id" })
-    }
-  }
-
-  const getScore = () => {
-    let correct = 0
-    questions.forEach((q, i) => { if (answers[i] === q.answer) correct++ })
-    return { correct, total: questions.length, score: Math.round((correct / questions.length) * 100) }
-  }
-
-  // 문제 이동 시 풀이 초기화
-  const moveTo = (idx: number) => {
-    setCurrent(idx)
-    setShowExplanation(false)
-    setShowNotes(false)
-    setNotes([])
-    setMyNote("")
-  }
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400">문제 불러오는 중...</p>
-    </div>
-  )
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400">문제 불러오는 중...</p></div>
 
   if (questions.length === 0) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -216,8 +209,8 @@ function CBTStartInner() {
               <p className="text-4xl font-bold text-blue-600 mb-2">{score}점</p>
               <p className="text-gray-500">{total}문제 중 {correct}문제 정답</p>
             </div>
-            {/* AI 분석 */}
-            <button onClick={getAiAnalysis} disabled={aiLoading} className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 mb-3">
+            <button onClick={getAiAnalysis} disabled={aiLoading}
+              className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 mb-3">
               {aiLoading ? "🤖 AI 분석 중..." : "🤖 AI 학습 분석 받기"}
             </button>
             {aiAnalysis && (
@@ -226,18 +219,13 @@ function CBTStartInner() {
               </div>
             )}
             <div className="flex gap-3">
-              <button
-                onClick={() => { setFinished(false); setAnswers({}); setCurrent(0); setTimeLeft(3600); setShowExplanation(false); setReviewIndex(null) }}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
-              >다시 풀기</button>
+              <button onClick={() => { setFinished(false); setAnswers({}); setCurrent(0); setTimeLeft(3600); setShowExplanation(false); setReviewIndex(null); setAiAnalysis("") }}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">다시 풀기</button>
               <button onClick={() => router.back()} className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-lg font-semibold hover:bg-gray-50">목록으로</button>
             </div>
           </div>
-
           <div className="bg-white rounded-2xl shadow overflow-hidden">
-            <div className="px-6 py-4 border-b">
-              <h2 className="font-bold text-gray-800">📋 문제별 정답 확인</h2>
-            </div>
+            <div className="px-6 py-4 border-b"><h2 className="font-bold text-gray-800">📋 문제별 정답 확인</h2></div>
             <div className="divide-y">
               {questions.map((q, i) => {
                 const myAnswer = answers[i]
@@ -315,10 +303,16 @@ function CBTStartInner() {
         )}
 
         <div className="bg-white rounded-xl shadow p-6 mb-4">
-          <div className="flex flex-wrap gap-2 mb-3">
-            <p className="text-xs text-gray-400">{q.subject} · {q.year}년 {q.round}회</p>
-            {q.importance === "필수" && <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>}
-            {q.importance === "중요" && <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex flex-wrap gap-2">
+              <p className="text-xs text-gray-400">{q.subject} · {q.year}년 {q.round}회</p>
+              {q.importance === "필수" && <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>}
+              {q.importance === "중요" && <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>}
+            </div>
+            {/* 북마크 버튼 */}
+            <button onClick={() => toggleBookmark(q.id)} className="text-xl ml-2 flex-shrink-0">
+              {bookmarks.has(q.id) ? "🔖" : "📄"}
+            </button>
           </div>
           <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">{q.question_number}. {q.question_text}</p>
           {q.duplicate_cnt >= 2 && (
@@ -359,29 +353,20 @@ function CBTStartInner() {
           </div>
         )}
 
-        {/* 풀이 섹션 */}
         <button onClick={handleToggleNotes} className="w-full py-2 text-sm text-purple-600 hover:underline mb-3 border border-purple-200 rounded-xl bg-purple-50">
           {showNotes ? "✏️ 풀이 닫기 ▲" : "✏️ 풀이 보기 / 작성 ▼"}
         </button>
 
         {showNotes && (
           <div className="bg-white rounded-xl shadow p-5 mb-4">
-            {/* 내 풀이 작성 */}
             {user ? (
               <div className="mb-5">
                 <p className="text-sm font-semibold text-gray-700 mb-2">✏️ 내 풀이 작성</p>
-                <textarea
-                  value={myNote}
-                  onChange={e => setMyNote(e.target.value)}
+                <textarea value={myNote} onChange={e => setMyNote(e.target.value)}
                   placeholder="이 문제의 풀이를 작성해보세요. 다른 수험생에게 도움이 됩니다!"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-purple-400"
-                  rows={4}
-                />
-                <button
-                  onClick={saveNote}
-                  disabled={noteSaving || !myNote.trim()}
-                  className="mt-2 w-full py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-40"
-                >
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-purple-400" rows={4} />
+                <button onClick={saveNote} disabled={noteSaving || !myNote.trim()}
+                  className="mt-2 w-full py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-40">
                   {noteSaving ? "저장 중..." : "풀이 저장"}
                 </button>
               </div>
@@ -390,12 +375,8 @@ function CBTStartInner() {
                 풀이를 작성하려면 <a href="/login" className="text-purple-600 font-semibold hover:underline">로그인</a>이 필요합니다
               </div>
             )}
-
-            {/* 다른 사람 풀이 */}
             <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">
-                👥 다른 수험생 풀이 {notes.length > 0 && <span className="text-gray-400 font-normal">({notes.length}개)</span>}
-              </p>
+              <p className="text-sm font-semibold text-gray-700 mb-3">👥 다른 수험생 풀이 {notes.length > 0 && <span className="text-gray-400 font-normal">({notes.length}개)</span>}</p>
               {notesLoading ? (
                 <p className="text-xs text-gray-400 text-center py-4">불러오는 중...</p>
               ) : notes.length === 0 ? (
@@ -406,17 +387,10 @@ function CBTStartInner() {
                     <div key={note.id} className={`rounded-xl border p-4 ${idx === 0 ? "border-yellow-300 bg-yellow-50" : "border-gray-200 bg-gray-50"}`}>
                       {idx === 0 && <span className="text-xs text-yellow-600 font-bold mb-1 block">🏆 베스트 풀이</span>}
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-gray-400">
-                          {note.user_id === user?.id ? "✏️ 내 풀이" : `수험생 ${note.user_id.slice(0, 6)}`}
-                        </span>
-                        <button
-                          onClick={() => toggleLike(note.id)}
-                          disabled={!user}
+                        <span className="text-xs text-gray-400">{note.user_id === user?.id ? "✏️ 내 풀이" : `수험생 ${note.user_id.slice(0, 6)}`}</span>
+                        <button onClick={() => toggleLike(note.id)} disabled={!user}
                           className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition-all
-                            ${likedNotes.has(note.id)
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-gray-500 border-gray-300 hover:border-blue-400"}`}
-                        >
+                            ${likedNotes.has(note.id) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300 hover:border-blue-400"}`}>
                           👍 {note.like_count}
                         </button>
                       </div>
@@ -431,13 +405,9 @@ function CBTStartInner() {
 
         <div className="flex gap-3">
           <button onClick={() => moveTo(current - 1)} disabled={current === 0}
-            className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-xl font-semibold disabled:opacity-30 hover:bg-gray-50">
-            ← 이전
-          </button>
+            className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-xl font-semibold disabled:opacity-30 hover:bg-gray-50">← 이전</button>
           <button onClick={() => moveTo(current + 1)} disabled={current === questions.length - 1}
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold disabled:opacity-30 hover:bg-blue-700">
-            다음 →
-          </button>
+            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold disabled:opacity-30 hover:bg-blue-700">다음 →</button>
         </div>
       </div>
     </div>
@@ -451,8 +421,3 @@ export default function CBTStartPage() {
     </Suspense>
   )
 }
-
-
-
-
-
