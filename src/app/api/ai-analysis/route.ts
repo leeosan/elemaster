@@ -2,12 +2,46 @@
 
 export async function POST(req: NextRequest) {
   try {
-    const { questions, answers } = await req.json()
-    const wrongQs = questions.filter((q: any, i: number) => answers[i] !== q.answer)
+    const { questions, answers, mode, singleQuestion } = await req.json()
 
-    const prompt = `당신은 전기기능장 시험 전문 강사입니다.
+    let prompt = ""
 
-[전체 문제]
+    // 단일 문제 암기법 모드
+    if (mode === "single" && singleQuestion) {
+      const q = singleQuestion
+      prompt = `당신은 전기기능장 시험 전문 강사입니다.
+
+다음 문제에 대해 분석해주세요:
+
+[문제] ${q.question_text}
+[과목] ${q.subject}
+[보기]
+1번: ${q.option_1}
+2번: ${q.option_2}
+3번: ${q.option_3}
+4번: ${q.option_4}
+[정답] ${q.answer}번: ${q["option_"+q.answer]}
+
+다음 형식으로 간결하게 답변해주세요:
+
+## 💡 핵심 개념
+이 문제의 핵심 개념 한 줄 요약
+
+## 🧠 왜 정답인가
+정답이 ${q.answer}번인 이유를 쉽게 설명
+
+## 🔑 암기법
+이 개념을 쉽게 기억하는 연상법이나 암기 공식`
+
+    } else {
+      // 전체 분석 모드
+      const wrongQs = mode === "wrongOnly"
+        ? questions
+        : questions.filter((q: any, i: number) => answers[i] !== q.answer)
+
+      prompt = `당신은 전기기능장 시험 전문 강사입니다.
+
+[${mode === "wrongOnly" ? "누적 오답 문제" : "전체 문제"}]
 ${questions.map((q: any, i: number) => `${i+1}. [${q.subject}] ${q.question_text} (정답: ${q.answer}번)`).join("\n")}
 
 [틀린 문제]
@@ -26,6 +60,7 @@ ${wrongQs.length === 0 ? "없음 (모두 정답!)" : wrongQs.map((q: any) => `- 
 
 ## 📝 다음 학습 추천
 집중 공부할 부분`
+    }
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -36,7 +71,7 @@ ${wrongQs.length === 0 ? "없음 (모두 정답!)" : wrongQs.map((q: any) => `- 
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1000,
+        max_tokens: 800,
         messages: [{ role: "user", content: prompt }]
       })
     })

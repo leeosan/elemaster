@@ -11,6 +11,8 @@ export default function MyPage() {
   const [stats, setStats] = useState({ total: 0, thisWeek: 0, subjects: {} as any })
   const [aiAnalysis, setAiAnalysis] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
+  const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
+  const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -52,20 +54,34 @@ export default function MyPage() {
     setAiLoading(true)
     setAiAnalysis("")
     const questions = wrongAnswers.map(w => w.questions).filter(Boolean)
-    const answers: any = {}
-    wrongAnswers.forEach((w, i) => { answers[i] = w.my_answer })
     try {
       const res = await fetch("/api/ai-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questions, answers, mode: "wrongOnly" })
+        body: JSON.stringify({ questions, answers: {}, mode: "wrongOnly" })
       })
       const data = await res.json()
       setAiAnalysis(data.result || "분석 실패")
     } catch {
-      setAiAnalysis("AI 분석 서비스가 일시적으로 중단됐습니다. 잠시 후 다시 시도해주세요.")
+      setAiAnalysis("AI 분석 서비스가 일시적으로 중단됐습니다.")
     }
     setAiLoading(false)
+  }
+
+  const getSingleAi = async (index: number, question: any) => {
+    setSingleAiLoading(index)
+    try {
+      const res = await fetch("/api/ai-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "single", singleQuestion: question, questions: [], answers: {} })
+      })
+      const data = await res.json()
+      setSingleAi(prev => ({ ...prev, [index]: data.result || "분석 실패" }))
+    } catch {
+      setSingleAi(prev => ({ ...prev, [index]: "AI 분석 서비스가 일시적으로 중단됐습니다." }))
+    }
+    setSingleAiLoading(null)
   }
 
   if (loading) return (
@@ -95,7 +111,7 @@ export default function MyPage() {
           </div>
         </div>
 
-        {/* AI 분석 버튼 */}
+        {/* 전체 AI 분석 버튼 */}
         {wrongAnswers.length > 0 && (
           <div className="mb-6">
             <button
@@ -103,7 +119,7 @@ export default function MyPage() {
               disabled={aiLoading}
               className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50"
             >
-              {aiLoading ? "🤖 AI 분석 중..." : "🤖 내 오답 AI 분석 받기"}
+              {aiLoading ? "🤖 AI 분석 중..." : "🤖 내 오답 전체 AI 분석 받기"}
             </button>
             {aiAnalysis && (
               <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-5 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
@@ -191,9 +207,22 @@ export default function MyPage() {
                           ))}
                         </div>
                         {q.explanation && (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-gray-700">
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-gray-700 mb-3">
                             <p className="font-semibold text-yellow-700 mb-1">📖 해설</p>
                             <p>{q.explanation}</p>
+                          </div>
+                        )}
+                        {/* AI 암기법 버튼 */}
+                        <button
+                          onClick={() => getSingleAi(i, q)}
+                          disabled={singleAiLoading === i}
+                          className="w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50"
+                        >
+                          {singleAiLoading === i ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
+                        </button>
+                        {singleAi[i] && (
+                          <div className="mt-2 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                            {singleAi[i]}
                           </div>
                         )}
                       </div>
