@@ -18,6 +18,8 @@ function CBTStartInner() {
   const [finished, setFinished] = useState(false)
   const [showExplanation, setShowExplanation] = useState(false)
   const [reviewIndex, setReviewIndex] = useState<number | null>(null)
+  const [aiAnalysis, setAiAnalysis] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
   const [user, setUser] = useState<any>(null)
 
   // 풀이 관련
@@ -138,6 +140,22 @@ function CBTStartInner() {
     setShowExplanation(false)
   }
 
+  const getAiAnalysis = async () => {
+    setAiLoading(true)
+    setAiAnalysis("")
+    const wrongQs = questions.filter((q: any, i: number) => answers[i] !== q.answer)
+    const prompt = `당신은 전기기능장 시험 전문 강사입니다. 아래는 수험생이 방금 풀었던 CBT 문제 목록입니다.\n\n[전체 문제]\n${questions.map((q: any, i: number) => `${i+1}. [${q.subject}] ${q.question_text} (정답: ${q.answer}번)`).join("\n")}\n\n[틀린 문제]\n${wrongQs.length === 0 ? "없음" : wrongQs.map((q: any) => `- [${q.subject}] ${q.question_text}`).join("\n")}\n\n다음 형식으로 분석해주세요:\n## 📊 취약 과목 분석\n## 🎯 핵심 출제 포인트\n## 💡 쉽게 암기하는 법\n## 📝 다음 학습 추천`
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] })
+      })
+      const data = await res.json()
+      setAiAnalysis(data.content?.[0]?.text || "분석 실패")
+    } catch { setAiAnalysis("분석 중 오류가 발생했습니다.") }
+    setAiLoading(false)
+  }
   const saveWrongAnswers = async () => {
     if (!user) return
     const supabase = createClient()
@@ -198,6 +216,15 @@ function CBTStartInner() {
               <p className="text-4xl font-bold text-blue-600 mb-2">{score}점</p>
               <p className="text-gray-500">{total}문제 중 {correct}문제 정답</p>
             </div>
+            {/* AI 분석 */}
+            <button onClick={getAiAnalysis} disabled={aiLoading} className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 mb-3">
+              {aiLoading ? "🤖 AI 분석 중..." : "🤖 AI 학습 분석 받기"}
+            </button>
+            {aiAnalysis && (
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-5 mb-4 text-left text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {aiAnalysis}
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => { setFinished(false); setAnswers({}); setCurrent(0); setTimeLeft(3600); setShowExplanation(false); setReviewIndex(null) }}
@@ -424,6 +451,7 @@ export default function CBTStartPage() {
     </Suspense>
   )
 }
+
 
 
 
