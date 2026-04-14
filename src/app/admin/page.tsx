@@ -17,6 +17,9 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [userSearch, setUserSearch] = useState("")
+  const [posts, setPosts] = useState<any[]>([])
+  const [postsLoading, setPostsLoading] = useState(false)
+  const [postSearch, setPostSearch] = useState("")
   const router = useRouter()
 
   useEffect(() => {
@@ -68,6 +71,7 @@ export default function AdminPage() {
   const handleTabChange = (t: string) => {
     setTab(t)
     if (t === "users") fetchUsers()
+    if (t === "posts") fetchPosts()
   }
 
   const updateField = async (id: number, field: string, value: any) => {
@@ -78,10 +82,26 @@ export default function AdminPage() {
     setSaving(null)
   }
 
+
+  const fetchPosts = async () => {
+    setPostsLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
+    setPosts(data || [])
+    setPostsLoading(false)
+  }
+
+  const deletePost = async (postId: number, title: string) => {
+    if (!confirm("게시글을 삭제하시겠습니까?")) return
+    const supabase = createClient()
+    await supabase.from("posts").delete().eq("id", postId)
+    setPosts(prev => prev.filter(p => p.id !== postId))
+  }
   const filtered = questions.filter(q =>
     q.question_text?.includes(search) && (filterYear ? q.year == filterYear : true)
   )
 
+  const filteredPosts = posts.filter(p => p.title?.includes(postSearch) || p.content?.includes(postSearch))
   const filteredUsers = users.filter(u =>
     u.email?.includes(userSearch) || u.name?.includes(userSearch)
   )
@@ -111,6 +131,10 @@ export default function AdminPage() {
               className={"px-4 py-1.5 rounded-lg text-sm font-semibold " + (tab === "users" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
               👥 회원 관리
             </button>
+            <button onClick={() => handleTabChange("posts")}
+              className={"px-4 py-1.5 rounded-lg text-sm font-semibold " + (tab === "posts" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
+              💬 게시판 관리
+            </button>
           </div>
           {tab === "questions" && (
             <div className="flex gap-2 flex-wrap">
@@ -124,7 +148,53 @@ export default function AdminPage() {
               <span className="text-xs text-gray-400 self-center">{filtered.length}문제</span>
             </div>
           )}
-          {tab === "users" && (
+          {tab === "posts" && (
+          <div className="flex gap-2">
+            <input type="text" placeholder="제목 / 내용 검색..." value={postSearch} onChange={e => setPostSearch(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
+            <span className="text-xs text-gray-400 self-center">총 {filteredPosts.length}개</span>
+          </div>
+        )}
+
+        {tab === "posts" && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            {postsLoading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm">게시글이 없습니다</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-600 text-xs">
+                  <tr>
+                    <th className="px-4 py-3 text-center w-24">카테고리</th>
+                    <th className="px-4 py-3 text-left">제목</th>
+                    <th className="px-4 py-3 text-center w-20">작성자</th>
+                    <th className="px-4 py-3 text-center w-24">작성일</th>
+                    <th className="px-4 py-3 text-center w-16">삭제</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredPosts.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-center">
+                        <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + (p.category === "free" ? "bg-blue-100 text-blue-600" : p.category === "qna" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700")}>
+                          {p.category === "free" ? "💬 자유" : p.category === "qna" ? "❓ 질문/답변" : "🏆 합격후기"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 text-xs">{p.title?.length > 40 ? p.title.slice(0, 40) + "..." : p.title}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">{p.user_id?.slice(0, 6)}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(p.created_at)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => deletePost(p.id, p.title)} className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+        {tab === "users" && (
             <div className="flex gap-2">
               <input type="text" placeholder="이메일 / 이름 검색..." value={userSearch} onChange={e => setUserSearch(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
@@ -178,6 +248,52 @@ export default function AdminPage() {
           </div>
         )}
 
+        {tab === "posts" && (
+          <div className="flex gap-2">
+            <input type="text" placeholder="제목 / 내용 검색..." value={postSearch} onChange={e => setPostSearch(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
+            <span className="text-xs text-gray-400 self-center">총 {filteredPosts.length}개</span>
+          </div>
+        )}
+
+        {tab === "posts" && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            {postsLoading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm">게시글이 없습니다</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-600 text-xs">
+                  <tr>
+                    <th className="px-4 py-3 text-center w-24">카테고리</th>
+                    <th className="px-4 py-3 text-left">제목</th>
+                    <th className="px-4 py-3 text-center w-20">작성자</th>
+                    <th className="px-4 py-3 text-center w-24">작성일</th>
+                    <th className="px-4 py-3 text-center w-16">삭제</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredPosts.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-center">
+                        <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + (p.category === "free" ? "bg-blue-100 text-blue-600" : p.category === "qna" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700")}>
+                          {p.category === "free" ? "💬 자유" : p.category === "qna" ? "❓ 질문/답변" : "🏆 합격후기"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 text-xs">{p.title?.length > 40 ? p.title.slice(0, 40) + "..." : p.title}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">{p.user_id?.slice(0, 6)}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(p.created_at)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => deletePost(p.id, p.title)} className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
         {tab === "users" && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             {usersLoading ? (
@@ -243,9 +359,3 @@ export default function AdminPage() {
     </div>
   )
 }
-
-
-
-
-
-
