@@ -1,5 +1,4 @@
 ﻿import Link from "next/link"
-
 export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50">
@@ -35,6 +34,18 @@ export default function Home() {
             <p className="text-gray-500 text-sm mt-1">일정 / 합격률 / 준비물</p>
           </Link>
         </div>
+
+        {/* 후원 섹션 */}
+        <div className="mt-16 bg-white rounded-2xl shadow p-6 text-center border border-yellow-100">
+          <p className="text-lg mb-1">☕ 개발자 응원하기</p>
+          <p className="text-sm text-gray-400 mb-4">무료 서비스 유지에 큰 힘이 됩니다 🙏</p>
+          <div className="inline-flex flex-col items-center bg-yellow-50 border border-yellow-200 rounded-xl px-8 py-4 gap-1">
+            <span className="text-xs text-gray-400">신한은행</span>
+            <span className="text-xl font-bold text-gray-800 tracking-widest">110-051-717060</span>
+            <span className="text-sm text-gray-500">이x재</span>
+          </div>
+        </div>
+
       </div>
     </main>
   )
