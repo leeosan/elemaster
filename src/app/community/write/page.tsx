@@ -1,12 +1,13 @@
 ﻿"use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
-export default function CommunityWritePage() {
+function CommunityWriteInner() {
+  const searchParams = useSearchParams()
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [category, setCategory] = useState("free")
+  const [category, setCategory] = useState(searchParams.get("category") || "free")
   const [user, setUser] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -85,5 +86,13 @@ export default function CommunityWritePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CommunityWritePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-400">로딩 중...</p></div>}>
+      <CommunityWriteInner />
+    </Suspense>
   )
 }

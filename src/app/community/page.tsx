@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -65,7 +65,7 @@ export default function CommunityPage() {
           <h1 className="text-2xl font-bold text-gray-800">💬 커뮤니티</h1>
           {user && (
             <button
-              onClick={() => router.push("/community/write")}
+              onClick={() => router.push(`/community/write?category=${category === "all" ? "free" : category}`)}
               className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700"
             >
               ✏️ 글쓰기
@@ -96,7 +96,7 @@ export default function CommunityPage() {
               <p className="text-4xl mb-3">📝</p>
               <p className="text-gray-500 text-sm">첫 번째 글을 작성해보세요!</p>
               {user && (
-                <button onClick={() => router.push("/community/write")} className="mt-4 text-blue-600 text-sm hover:underline">
+                <button onClick={() => router.push(`/community/write?category=${category === "all" ? "free" : category}`)} className="mt-4 text-blue-600 text-sm hover:underline">
                   글쓰기 →
                 </button>
               )}
