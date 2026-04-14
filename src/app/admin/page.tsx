@@ -37,7 +37,7 @@ export default function AdminPage() {
     const supabase = createClient()
     const { data } = await supabase.from("questions")
       .select("id, question_number, question_text, year, round, subject, is_deprecated, importance")
-      .order("year", { ascending: false }).order("round").order("question_number")
+      .order("year", { ascending: false }).order("round").order("question_number").range(0, 9999)
     setQuestions(data || [])
     const uniqueYears = [...new Set((data || []).map((q: any) => q.year))].sort((a, b) => b - a)
     setYears(uniqueYears)
