@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ko_KR",
-    url: "https://elemaster.vercel.app",
+    url: "https://elemaster.kr",
     siteName: "EleMaster",
     title: "EleMaster - 전기 자격증 합격의 지름길",
     description: "전기기능장, 전기기사, 전기기능사 CBT 모의고사 및 과년도 기출문제 무료 제공",
@@ -52,7 +52,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
-        <link rel="canonical" href="https://elemaster.vercel.app" />
+        <link rel="canonical" href="https://elemaster.kr" />
       </head>
       <body className={geist.className}>
         <Header />
@@ -61,4 +61,5 @@ export default function RootLayout({
     </html>
   )
 }
+
 
