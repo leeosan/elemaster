@@ -269,7 +269,7 @@ function CBTStartInner() {
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <span className="text-sm font-semibold text-gray-600">{current + 1} / {questions.length}</span>
           <span className={`text-lg font-bold ${timeLeft < 300 ? "text-red-500" : "text-blue-600"}`}>⏱ {formatTime(timeLeft)}</span>
-          <button onClick={() => setFinished(true)} className="text-sm bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600">제출</button>
+          <button onClick={async () => { setFinished(true); await saveWrongAnswers() }} className="text-sm bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600">제출</button>
         </div>
         <div className="max-w-2xl mx-auto mt-2 bg-gray-200 rounded-full h-1.5">
           <div className="bg-blue-600 h-1.5 rounded-full transition-all" style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
@@ -424,6 +424,7 @@ export default function CBTStartPage() {
     </Suspense>
   )
 }
+
 
 
 
