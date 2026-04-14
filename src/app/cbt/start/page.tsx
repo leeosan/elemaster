@@ -21,7 +21,7 @@ function CBTStartInner() {
   useEffect(() => {
     const supabase = createClient()
     let query = supabase
-      .from("questions")
+      .from("questions_with_meta")
       .select("*")
       .eq("exam_type_id", examId)
 
@@ -143,11 +143,45 @@ function CBTStartInner() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6">
+
+        {/* 출제기준 변경 경고 */}
+        {q.is_deprecated && (
+          <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-3 flex items-start gap-2">
+            <span className="text-red-500 text-lg">🚫</span>
+            <div>
+              <p className="text-red-700 font-semibold text-sm">출제기준 변경 문제</p>
+              <p className="text-red-500 text-xs">현재 출제기준과 다릅니다. 학습 참고용으로만 활용하세요.</p>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow p-6 mb-4">
-          <p className="text-xs text-gray-400 mb-2">{q.subject} · {q.year}년 {q.round}회</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            <p className="text-xs text-gray-400">{q.subject} · {q.year}년 {q.round}회</p>
+            {/* 중요도 뱃지 */}
+            {q.importance === "필수" && (
+              <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>
+            )}
+            {q.importance === "중요" && (
+              <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>
+            )}
+          </div>
+
           <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">
             {q.question_number}. {q.question_text}
           </p>
+
+          {/* 중복 출제 뱃지 */}
+          {q.duplicate_cnt >= 2 && (
+            <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
+              <span className="text-blue-500 text-sm">🔁</span>
+              <div>
+                <p className="text-blue-700 text-xs font-semibold">{q.duplicate_cnt}회 출제된 문제</p>
+                <p className="text-blue-500 text-xs">{q.duplicate_appearances}</p>
+              </div>
+            </div>
+          )}
+
           {q.image_url && (
             <div className="mt-3 mb-2 flex justify-center">
               <img
