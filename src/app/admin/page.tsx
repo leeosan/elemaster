@@ -55,7 +55,7 @@ export default function AdminPage() {
     if (t === "users") fetchUsers()
   }
 
-  const updateField = async (id, field, value) => {
+  const updateField = async (id: number, field: string, value: any) => {
     setSaving(id)
     const supabase = createClient()
     await supabase.from("questions").update({ [field]: value }).eq("id", id)
@@ -221,5 +221,6 @@ export default function AdminPage() {
     </div>
   )
 }
+
 
 
