@@ -41,6 +41,21 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  const deleteUser = async (userId: string, email: string) => {
+    if (!confirm(`${email} 회원을 삭제하시겠습니까?`)) return
+    const res = await fetch("/api/admin/delete-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId })
+    })
+    if (res.ok) {
+      setUsers(prev => prev.filter(u => u.id !== userId))
+      alert("삭제 완료")
+    } else {
+      alert("삭제 실패")
+    }
+  }
+
   const fetchUsers = async () => {
     if (users.length > 0) return
     setUsersLoading(true)
@@ -195,6 +210,7 @@ export default function AdminPage() {
                       <th className="px-4 py-3 text-center w-24">가입경로</th>
                       <th className="px-4 py-3 text-center w-28">가입일</th>
                       <th className="px-4 py-3 text-center w-28">최근 로그인</th>
+                      <th className="px-4 py-3 text-center w-16">삭제</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -209,6 +225,12 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(u.created_at)}</td>
                         <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(u.last_sign_in_at)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => deleteUser(u.id, u.email)}
+                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">
+                            삭제
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -221,6 +243,8 @@ export default function AdminPage() {
     </div>
   )
 }
+
+
 
 
 
