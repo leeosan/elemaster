@@ -30,7 +30,10 @@ function CBTStartInner() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) { router.replace("/login"); return }
+      setUser(data.user)
+    })
   }, [])
 
   useEffect(() => {
@@ -404,4 +407,5 @@ export default function CBTStartPage() {
     </Suspense>
   )
 }
+
 

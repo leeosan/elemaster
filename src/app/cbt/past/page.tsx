@@ -9,9 +9,21 @@ function CBTPastInner() {
   const examTypeId = searchParams.get("exam") || "1"
 
   const [exams, setExams] = useState<any[]>([])
+  const [authChecked, setAuthChecked] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace("/login"); return }
+      setAuthChecked(true)
+    }
+    checkAuth()
+  }, [])
+
+  useEffect(() => {
+    if (!authChecked) return
     async function fetchAll() {
       const supabase = createClient()
       let allData: any[] = []
@@ -39,7 +51,7 @@ function CBTPastInner() {
       setLoading(false)
     }
     fetchAll()
-  }, [examTypeId])
+  }, [examTypeId, authChecked])
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -86,3 +98,4 @@ export default function CBTPastPage() {
     </Suspense>
   )
 }
+
