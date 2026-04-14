@@ -36,7 +36,7 @@ export default function AdminPage() {
       .select("id, question_number, question_text, year, round, subject, is_deprecated, importance")
       .order("year", { ascending: false }).order("round").order("question_number")
     setQuestions(data || [])
-    const uniqueYears = [...new Set((data || []).map(q => q.year))].sort((a, b) => b - a)
+    const uniqueYears = [...new Set((data || []).map((q: any) => q.year))].sort((a, b) => b - a)
     setYears(uniqueYears)
     setLoading(false)
   }
@@ -71,7 +71,7 @@ export default function AdminPage() {
     u.email?.includes(userSearch) || u.name?.includes(userSearch)
   )
 
-  const formatDate = (d) => {
+  const formatDate = (d: string) => {
     if (!d) return "-"
     return new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
   }
@@ -221,6 +221,7 @@ export default function AdminPage() {
     </div>
   )
 }
+
 
 
 
