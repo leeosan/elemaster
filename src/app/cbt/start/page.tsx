@@ -146,14 +146,14 @@ function CBTStartInner() {
     const wrongQs = questions.filter((q: any, i: number) => answers[i] !== q.answer)
     const prompt = `당신은 전기기능장 시험 전문 강사입니다. 아래는 수험생이 방금 풀었던 CBT 문제 목록입니다.\n\n[전체 문제]\n${questions.map((q: any, i: number) => `${i+1}. [${q.subject}] ${q.question_text} (정답: ${q.answer}번)`).join("\n")}\n\n[틀린 문제]\n${wrongQs.length === 0 ? "없음" : wrongQs.map((q: any) => `- [${q.subject}] ${q.question_text}`).join("\n")}\n\n다음 형식으로 분석해주세요:\n## 📊 취약 과목 분석\n## 🎯 핵심 출제 포인트\n## 💡 쉽게 암기하는 법\n## 📝 다음 학습 추천`
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/ai-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ questions, answers })
       })
       const data = await res.json()
-      setAiAnalysis(data.content?.[0]?.text || "분석 실패")
-    } catch { setAiAnalysis("분석 중 오류가 발생했습니다.") }
+      setAiAnalysis(data.result || "분석 실패")
+    } catch { setAiAnalysis("AI 분석 서비스가 일시적으로 중단됐습니다. 잠시 후 다시 시도해주세요.") }
     setAiLoading(false)
   }
   const saveWrongAnswers = async () => {
