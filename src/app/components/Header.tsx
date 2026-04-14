@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
+const ADMIN_EMAIL = "jaetech01@gmail.com"
+
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
@@ -23,6 +25,8 @@ export default function Header() {
     router.push("/")
   }
 
+  const isAdmin = user?.email === ADMIN_EMAIL
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -37,6 +41,9 @@ export default function Header() {
           <Link href="/mypage" className="hover:text-blue-600">나의 학습</Link>
           <Link href="/exam-info" className="hover:text-blue-600">시험정보</Link>
           <Link href="/calculator" className="hover:text-blue-600">공학용계산기</Link>
+          {isAdmin && (
+            <Link href="/admin" className="hover:text-red-600 text-red-500 font-bold">🛠 관리자</Link>
+          )}
         </nav>
 
         {/* 로그인/로그아웃 버튼 */}
@@ -80,6 +87,9 @@ export default function Header() {
           <Link href="/mypage" onClick={() => setMenuOpen(false)}>📊 나의 학습</Link>
           <Link href="/exam-info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
           <Link href="/calculator" onClick={() => setMenuOpen(false)}>📱 공학용계산기</Link>
+          {isAdmin && (
+            <Link href="/admin" onClick={() => setMenuOpen(false)} className="text-red-500 font-bold">🛠 관리자</Link>
+          )}
           <hr />
           {user ? (
             <>
