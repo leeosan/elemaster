@@ -20,6 +20,11 @@ export default function CommunityWritePage() {
     })
   }, [])
 
+  const handleCategoryChange = (key: string) => {
+    setCategory(key)
+    categoryRef.current = key
+  }
+
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) return
     setSaving(true)
@@ -43,22 +48,23 @@ export default function CommunityWritePage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow p-6">
-          {/* 카테고리 */}
           <div className="flex gap-2 mb-4">
             {[
               { key: "free", label: "💬 자유" },
               { key: "qna", label: "❓ 질문/답변" },
               { key: "pass", label: "🏆 합격후기" },
             ].map(c => (
-              <button key={c.key} onClick={() => setCategory(c.key); categoryRef.current = c.key}
+              <button
+                key={c.key}
+                onClick={() => handleCategoryChange(c.key)}
                 className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all
-                  ${category === c.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  ${category === c.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              >
                 {c.label}
               </button>
             ))}
           </div>
 
-          {/* 제목 */}
           <input
             type="text"
             placeholder="제목을 입력하세요"
@@ -67,7 +73,6 @@ export default function CommunityWritePage() {
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm mb-3 focus:outline-none focus:border-blue-400"
           />
 
-          {/* 내용 */}
           <textarea
             placeholder="내용을 입력하세요"
             value={content}
