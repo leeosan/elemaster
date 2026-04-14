@@ -12,20 +12,33 @@ function CBTPastInner() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase
-      .from("questions")
-      .select("year, round")
-      .eq("exam_type_id", examTypeId)
-      .order("round", { ascending: false })
-      .limit(2000)
-      .then(({ data }) => {
-        const unique = Array.from(
-          new Map((data || []).map((q: any) => [`${q.year}-${q.round}`, q])).values()
-        )
-        setExams(unique)
-        setLoading(false)
-      })
+    async function fetchAll() {
+      const supabase = createClient()
+      let allData: any[] = []
+      let from = 0
+      const pageSize = 1000
+
+      while (true) {
+        const { data, error } = await supabase
+          .from("questions")
+          .select("year, round")
+          .eq("exam_type_id", examTypeId)
+          .order("round", { ascending: false })
+          .range(from, from + pageSize - 1)
+
+        if (error || !data || data.length === 0) break
+        allData = [...allData, ...data]
+        if (data.length < pageSize) break
+        from += pageSize
+      }
+
+      const unique = Array.from(
+        new Map(allData.map((q: any) => [`${q.year}-${q.round}`, q])).values()
+      )
+      setExams(unique)
+      setLoading(false)
+    }
+    fetchAll()
   }, [examTypeId])
 
   if (loading) return (
