@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -36,7 +36,7 @@ function CBTPastInner() {
         const { data, error } = await supabase
           .from("questions")
           .select("year, round")
-          .eq("exam_type_id", examTypeId)
+          .eq("exam_type_id", examTypeId).lte("year", 2018)
           .order("round", { ascending: false })
           .range(from, from + pageSize - 1)
         if (error || !data || data.length === 0) break
