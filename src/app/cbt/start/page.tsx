@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -9,6 +9,7 @@ function CBTStartInner() {
   const examId = searchParams.get("exam") || "1"
   const year = searchParams.get("year")
   const round = searchParams.get("round")
+  const aiset = searchParams.get("aiset")
 
   const [questions, setQuestions] = useState<any[]>([])
   const [current, setCurrent] = useState(0)
@@ -28,6 +29,8 @@ function CBTStartInner() {
   const [notesLoading, setNotesLoading] = useState(false)
   const [noteSaving, setNoteSaving] = useState(false)
   const [likedNotes, setLikedNotes] = useState<Set<number>>(new Set())
+  const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
+  const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -41,16 +44,28 @@ function CBTStartInner() {
 
   useEffect(() => {
     const supabase = createClient()
-    let query = supabase.from("questions_with_meta").select("*").eq("exam_type_id", examId)
-    if (year && round) query = query.eq("year", year).eq("round", round)
-    query.limit(60).then(({ data }) => {
-      const sorted = year && round
-        ? (data || []).sort((a: any, b: any) => a.question_number - b.question_number)
-        : (data || []).sort(() => Math.random() - 0.5)
-      setQuestions(sorted)
-      setLoading(false)
-    })
-  }, [examId, year, round])
+    const load = async () => {
+      if (aiset) {
+        const { data: aiData } = await supabase.from("ai_exams").select("question_id, question_order").eq("set_number", aiset).order("question_order")
+        const ids = (aiData || []).map((r: any) => r.question_id)
+        const { data } = await supabase.from("questions_with_meta").select("*").in("id", ids)
+        const ordered = (aiData || []).map((r: any) => (data || []).find((q: any) => q.id === r.question_id)).filter(Boolean)
+        setQuestions(ordered)
+        setLoading(false)
+      } else {
+        let query = supabase.from("questions_with_meta").select("*").eq("exam_type_id", examId)
+        if (year && round) query = query.eq("year", year).eq("round", round)
+        query.limit(60).then(({ data }) => {
+          const sorted = year && round
+            ? (data || []).sort((a: any, b: any) => a.question_number - b.question_number)
+            : (data || []).sort(() => Math.random() - 0.5)
+          setQuestions(sorted)
+          setLoading(false)
+        })
+      }
+    }
+    load()
+  }, [examId, year, round, aiset])
 
   useEffect(() => {
     if (finished || loading) return
@@ -119,9 +134,6 @@ function CBTStartInner() {
       setBookmarks(prev => new Set(prev).add(questionId))
     }
   }
-
-  const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
-  const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
 
   const getSingleAi = async (index: number, question: any) => {
     setSingleAiLoading(index)
@@ -327,7 +339,7 @@ function CBTStartInner() {
         <div className="bg-white rounded-xl shadow p-6 mb-4">
           <div className="flex items-start justify-between mb-3">
             <div className="flex flex-wrap gap-2">
-              <p className="text-xs text-gray-400">{q.subject} · {q.year}년 {q.round}회</p>
+              <p className="text-xs text-gray-400">{q.subject} · {aiset ? `AI 추천 문제 ${aiset}` : `${q.year}년 ${q.round}회`}</p>
               {q.importance === "필수" && <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>}
               {q.importance === "중요" && <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>}
             </div>
@@ -337,24 +349,12 @@ function CBTStartInner() {
           </div>
           <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">{q.question_number}. {q.question_text}</p>
 
-          {/* 동일 출제 뱃지 */}
           {q.duplicate_cnt >= 2 && (
             <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
               <span className="text-blue-500 text-sm">🔁</span>
               <div>
                 <p className="text-blue-700 text-xs font-semibold">{q.duplicate_cnt}회 동일 출제</p>
                 <p className="text-blue-500 text-xs">{q.duplicate_appearances}</p>
-              </div>
-            </div>
-          )}
-
-          {/* 유사문제 뱃지 */}
-          {q.duplicate_cnt < 2 && q.similar_cnt >= 1 && (
-            <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 flex items-start gap-2">
-              <span className="text-indigo-500 text-sm">🔀</span>
-              <div>
-                <p className="text-indigo-700 text-xs font-semibold">유사문제 출제</p>
-                <p className="text-indigo-500 text-xs">{q.similar_appearances}</p>
               </div>
             </div>
           )}
@@ -388,7 +388,6 @@ function CBTStartInner() {
           </div>
         )}
 
-        {/* AI 암기법 버튼 - 문제풀때 */}
         {answers[current] && (
           <div className="mb-3">
             <button onClick={() => getSingleAi(current, questions[current])} disabled={singleAiLoading === current}
@@ -402,6 +401,7 @@ function CBTStartInner() {
             )}
           </div>
         )}
+
         <button onClick={handleToggleNotes} className="w-full py-2 text-sm text-purple-600 hover:underline mb-3 border border-purple-200 rounded-xl bg-purple-50">
           {showNotes ? "✏️ 풀이 닫기 ▲" : "✏️ 풀이 보기 / 작성 ▼"}
         </button>
