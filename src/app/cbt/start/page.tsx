@@ -272,9 +272,18 @@ function CBTStartInner() {
                           ))}
                         </div>
                         {q.explanation && (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-gray-700">
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-gray-700 mb-3">
                             <p className="font-semibold text-yellow-700 mb-1">📖 해설</p>
                             <p>{q.explanation}</p>
+                          </div>
+                        )}
+                        <button onClick={() => getSingleAi(i + 1000, q)} disabled={singleAiLoading === i + 1000}
+                          className="w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
+                          {singleAiLoading === i + 1000 ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
+                        </button>
+                        {singleAi[i + 1000] && (
+                          <div className="mt-2 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                            {singleAi[i + 1000]}
                           </div>
                         )}
                       </div>
