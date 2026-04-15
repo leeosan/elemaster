@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -118,6 +118,23 @@ function CBTStartInner() {
       await supabase.from("bookmarks").insert({ user_id: user.id, question_id: questionId })
       setBookmarks(prev => new Set(prev).add(questionId))
     }
+  }
+
+  const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
+  const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
+
+  const getSingleAi = async (index: number, question: any) => {
+    setSingleAiLoading(index)
+    try {
+      const res = await fetch("/api/ai-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "single", singleQuestion: question, questions: [], answers: {} })
+      })
+      const data = await res.json()
+      setSingleAi(prev => ({ ...prev, [index]: data.result || "분석 실패" }))
+    } catch { setSingleAi(prev => ({ ...prev, [index]: "AI 분석 서비스가 일시적으로 중단됐습니다." })) }
+    setSingleAiLoading(null)
   }
 
   const getAiAnalysis = async () => {
@@ -362,6 +379,20 @@ function CBTStartInner() {
           </div>
         )}
 
+        {/* AI 암기법 버튼 - 문제풀때 */}
+        {answers[current] && (
+          <div className="mb-3">
+            <button onClick={() => getSingleAi(current, questions[current])} disabled={singleAiLoading === current}
+              className="w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
+              {singleAiLoading === current ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
+            </button>
+            {singleAi[current] && (
+              <div className="mt-2 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {singleAi[current]}
+              </div>
+            )}
+          </div>
+        )}
         <button onClick={handleToggleNotes} className="w-full py-2 text-sm text-purple-600 hover:underline mb-3 border border-purple-200 rounded-xl bg-purple-50">
           {showNotes ? "✏️ 풀이 닫기 ▲" : "✏️ 풀이 보기 / 작성 ▼"}
         </button>
