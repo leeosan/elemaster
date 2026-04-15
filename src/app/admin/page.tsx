@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -20,6 +20,9 @@ export default function AdminPage() {
   const [posts, setPosts] = useState<any[]>([])
   const [postsLoading, setPostsLoading] = useState(false)
   const [postSearch, setPostSearch] = useState("")
+  const [aiSets, setAiSets] = useState<any[]>([])
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -53,6 +56,50 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  const fetchUsers = async () => {
+    if (users.length > 0) return
+    setUsersLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase.from("admin_users_view").select("*").order("created_at", { ascending: false })
+    setUsers(data || [])
+    setUsersLoading(false)
+  }
+
+  const fetchPosts = async () => {
+    setPostsLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
+    setPosts(data || [])
+    setPostsLoading(false)
+  }
+
+  const fetchAiSets = async () => {
+    setAiLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase.from("ai_exams").select("set_number, question_id").order("set_number")
+    const grouped = (data || []).reduce((acc: any, r: any) => {
+      acc[r.set_number] = (acc[r.set_number] || 0) + 1
+      return acc
+    }, {})
+    setAiSets(Object.entries(grouped).map(([set, cnt]) => ({ set: Number(set), cnt })))
+    setAiLoading(false)
+  }
+
+  const handleTabChange = (t: string) => {
+    setTab(t)
+    if (t === "users") fetchUsers()
+    if (t === "posts") fetchPosts()
+    if (t === "ai") fetchAiSets()
+  }
+
+  const updateField = async (id: number, field: string, value: any) => {
+    setSaving(id)
+    const supabase = createClient()
+    await supabase.from("questions").update({ [field]: value }).eq("id", id)
+    setQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q))
+    setSaving(null)
+  }
+
   const deleteUser = async (userId: string, email: string) => {
     if (!confirm(`${email} 회원을 삭제하시겠습니까?`)) return
     const res = await fetch("/api/admin/delete-user", {
@@ -68,52 +115,59 @@ export default function AdminPage() {
     }
   }
 
-  const fetchUsers = async () => {
-    if (users.length > 0) return
-    setUsersLoading(true)
-    const supabase = createClient()
-    const { data } = await supabase.from("admin_users_view").select("*").order("created_at", { ascending: false })
-    setUsers(data || [])
-    setUsersLoading(false)
-  }
-
-  const handleTabChange = (t: string) => {
-    setTab(t)
-    if (t === "users") fetchUsers()
-    if (t === "posts") fetchPosts()
-  }
-
-  const updateField = async (id: number, field: string, value: any) => {
-    setSaving(id)
-    const supabase = createClient()
-    await supabase.from("questions").update({ [field]: value }).eq("id", id)
-    setQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q))
-    setSaving(null)
-  }
-
-
-  const fetchPosts = async () => {
-    setPostsLoading(true)
-    const supabase = createClient()
-    const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
-    setPosts(data || [])
-    setPostsLoading(false)
-  }
-
   const deletePost = async (postId: number, title: string) => {
     if (!confirm("게시글을 삭제하시겠습니까?")) return
     const supabase = createClient()
     await supabase.from("posts").delete().eq("id", postId)
     setPosts(prev => prev.filter(p => p.id !== postId))
   }
+
+  const deleteAiSet = async (setNum: number) => {
+    if (!confirm(`AI 추천 문제 ${setNum}을 삭제하시겠습니까?`)) return
+    const supabase = createClient()
+    await supabase.from("ai_exams").delete().eq("set_number", setNum)
+    setAiSets(prev => prev.filter(s => s.set !== setNum))
+  }
+
+  const regenerateAiSets = async () => {
+    if (!confirm("모든 AI 추천 문제 세트를 재생성하시겠습니까?")) return
+    setAiGenerating(true)
+    const supabase = createClient()
+    await supabase.from("ai_exams").delete().neq("id", 0)
+
+    const subjects = [
+      { name: "전기이론", cnt: 12 },
+      { name: "전기기기", cnt: 15 },
+      { name: "전력전자", cnt: 7 },
+      { name: "전기설비", cnt: 11 },
+      { name: "송배전공학", cnt: 5 },
+      { name: "디지털공학", cnt: 4 },
+      { name: "공업경영", cnt: 6 },
+    ]
+
+    for (let setNum = 1; setNum <= 10; setNum++) {
+      let order = 1
+      for (const subj of subjects) {
+        const { data } = await supabase.from("questions")
+          .select("id").eq("subject", subj.name)
+          .order("id").limit(subj.cnt * 10)
+        if (!data) continue
+        const shuffled = data.sort(() => Math.random() - 0.5).slice(0, subj.cnt)
+        for (const q of shuffled) {
+          await supabase.from("ai_exams").insert({ set_number: setNum, question_id: q.id, question_order: order++ })
+        }
+      }
+    }
+    setAiGenerating(false)
+    fetchAiSets()
+    alert("AI 추천 문제 10세트 재생성 완료!")
+  }
+
   const filtered = questions.filter(q =>
     q.question_text?.includes(search) && (filterYear ? q.year == filterYear : true)
   )
-
+  const filteredUsers = users.filter(u => u.email?.includes(userSearch) || u.name?.includes(userSearch))
   const filteredPosts = posts.filter(p => p.title?.includes(postSearch) || p.content?.includes(postSearch))
-  const filteredUsers = users.filter(u =>
-    u.email?.includes(userSearch) || u.name?.includes(userSearch)
-  )
 
   const formatDate = (d: string) => {
     if (!d) return "-"
@@ -131,20 +185,20 @@ export default function AdminPage() {
       <div className="bg-white shadow-sm sticky top-0 z-10 px-4 py-3">
         <div className="max-w-5xl mx-auto">
           <h1 className="text-lg font-bold text-gray-800 mb-3">🛠 관리자 대시보드</h1>
-          <div className="flex gap-2 mb-3">
-            <button onClick={() => handleTabChange("questions")}
-              className={"px-4 py-1.5 rounded-lg text-sm font-semibold " + (tab === "questions" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
-              📝 문제 설정
-            </button>
-            <button onClick={() => handleTabChange("users")}
-              className={"px-4 py-1.5 rounded-lg text-sm font-semibold " + (tab === "users" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
-              👥 회원 관리
-            </button>
-            <button onClick={() => handleTabChange("posts")}
-              className={"px-4 py-1.5 rounded-lg text-sm font-semibold " + (tab === "posts" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
-              💬 게시판 관리
-            </button>
+          <div className="flex gap-2 mb-3 overflow-x-auto">
+            {[
+              { key: "questions", label: "📝 문제 설정" },
+              { key: "ai", label: "🤖 AI 추천 관리" },
+              { key: "users", label: "👥 회원 관리" },
+              { key: "posts", label: "💬 게시판 관리" },
+            ].map(t => (
+              <button key={t.key} onClick={() => handleTabChange(t.key)}
+                className={"px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap " + (tab === t.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
+                {t.label}
+              </button>
+            ))}
           </div>
+
           {tab === "questions" && (
             <div className="flex gap-2 flex-wrap">
               <input type="text" placeholder="문제 검색..." value={search} onChange={e => setSearch(e.target.value)}
@@ -157,63 +211,26 @@ export default function AdminPage() {
               <span className="text-xs text-gray-400 self-center">{filtered.length}문제</span>
             </div>
           )}
-          {tab === "posts" && (
-          <div className="flex gap-2">
-            <input type="text" placeholder="제목 / 내용 검색..." value={postSearch} onChange={e => setPostSearch(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
-            <span className="text-xs text-gray-400 self-center">총 {filteredPosts.length}개</span>
-          </div>
-        )}
-
-        {tab === "posts" && (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            {postsLoading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-            ) : filteredPosts.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">게시글이 없습니다</div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 text-gray-600 text-xs">
-                  <tr>
-                    <th className="px-4 py-3 text-center w-24">카테고리</th>
-                    <th className="px-4 py-3 text-left">제목</th>
-                    <th className="px-4 py-3 text-center w-20">작성자</th>
-                    <th className="px-4 py-3 text-center w-24">작성일</th>
-                    <th className="px-4 py-3 text-center w-16">삭제</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredPosts.map(p => (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-center">
-                        <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + (p.category === "free" ? "bg-blue-100 text-blue-600" : p.category === "qna" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700")}>
-                          {p.category === "free" ? "💬 자유" : p.category === "qna" ? "❓ 질문/답변" : "🏆 합격후기"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 text-xs">{p.title?.length > 40 ? p.title.slice(0, 40) + "..." : p.title}</td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">{p.user_id?.slice(0, 6)}</td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(p.created_at)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => deletePost(p.id, p.title)} className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-        {tab === "users" && (
+          {tab === "users" && (
             <div className="flex gap-2">
               <input type="text" placeholder="이메일 / 이름 검색..." value={userSearch} onChange={e => setUserSearch(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
               <span className="text-xs text-gray-400 self-center">총 {filteredUsers.length}명</span>
             </div>
           )}
+          {tab === "posts" && (
+            <div className="flex gap-2">
+              <input type="text" placeholder="제목 / 내용 검색..." value={postSearch} onChange={e => setPostSearch(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
+              <span className="text-xs text-gray-400 self-center">총 {filteredPosts.length}개</span>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
+
+        {/* 문제 설정 */}
         {tab === "questions" && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <table className="w-full text-sm">
@@ -257,52 +274,43 @@ export default function AdminPage() {
           </div>
         )}
 
-        {tab === "posts" && (
-          <div className="flex gap-2">
-            <input type="text" placeholder="제목 / 내용 검색..." value={postSearch} onChange={e => setPostSearch(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
-            <span className="text-xs text-gray-400 self-center">총 {filteredPosts.length}개</span>
+        {/* AI 추천 관리 */}
+        {tab === "ai" && (
+          <div>
+            <div className="bg-white rounded-xl shadow p-5 mb-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-bold text-gray-800">🤖 AI 추천 모의고사 세트</h2>
+                  <p className="text-xs text-gray-400 mt-1">과목별 비중: 전기이론 12 / 전기기기 15 / 전력전자 7 / 전기설비 11 / 송배전 5 / 디지털 4 / 공업경영 6</p>
+                </div>
+                <button onClick={regenerateAiSets} disabled={aiGenerating}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-50">
+                  {aiGenerating ? "⏳ 생성 중..." : "🔄 전체 재생성"}
+                </button>
+              </div>
+              {aiLoading ? (
+                <p className="text-center text-gray-400 text-sm py-8">불러오는 중...</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {aiSets.map(s => (
+                    <div key={s.set} className="border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-800 text-sm">AI 추천 문제 {s.set}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{s.cnt}문제</p>
+                      </div>
+                      <button onClick={() => deleteAiSet(s.set)}
+                        className="text-xs text-red-500 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">
+                        삭제
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {tab === "posts" && (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            {postsLoading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-            ) : filteredPosts.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">게시글이 없습니다</div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 text-gray-600 text-xs">
-                  <tr>
-                    <th className="px-4 py-3 text-center w-24">카테고리</th>
-                    <th className="px-4 py-3 text-left">제목</th>
-                    <th className="px-4 py-3 text-center w-20">작성자</th>
-                    <th className="px-4 py-3 text-center w-24">작성일</th>
-                    <th className="px-4 py-3 text-center w-16">삭제</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredPosts.map(p => (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-center">
-                        <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + (p.category === "free" ? "bg-blue-100 text-blue-600" : p.category === "qna" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700")}>
-                          {p.category === "free" ? "💬 자유" : p.category === "qna" ? "❓ 질문/답변" : "🏆 합격후기"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 text-xs">{p.title?.length > 40 ? p.title.slice(0, 40) + "..." : p.title}</td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">{p.user_id?.slice(0, 6)}</td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(p.created_at)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => deletePost(p.id, p.title)} className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
+        {/* 회원 관리 */}
         {tab === "users" && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             {usersLoading ? (
@@ -352,15 +360,54 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(u.last_sign_in_at)}</td>
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => deleteUser(u.id, u.email)}
-                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">
-                            삭제
-                          </button>
+                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </>
+            )}
+          </div>
+        )}
+
+        {/* 게시판 관리 */}
+        {tab === "posts" && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            {postsLoading ? (
+              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm">게시글이 없습니다</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-600 text-xs">
+                  <tr>
+                    <th className="px-4 py-3 text-center w-24">카테고리</th>
+                    <th className="px-4 py-3 text-left">제목</th>
+                    <th className="px-4 py-3 text-center w-20">작성자</th>
+                    <th className="px-4 py-3 text-center w-24">작성일</th>
+                    <th className="px-4 py-3 text-center w-16">삭제</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredPosts.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-center">
+                        <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + (p.category === "free" ? "bg-blue-100 text-blue-600" : p.category === "qna" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700")}>
+                          {p.category === "free" ? "💬 자유" : p.category === "qna" ? "❓ 질문/답변" : "🏆 합격후기"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 text-xs">{p.title?.length > 40 ? p.title.slice(0, 40) + "..." : p.title}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">{p.user_id?.slice(0, 6)}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(p.created_at)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => deletePost(p.id, p.title)}
+                          className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         )}
