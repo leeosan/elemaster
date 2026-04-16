@@ -45,6 +45,12 @@ export default function CBTPage() {
                   >
                     과년도 풀기
                   </Link>
+                  <Link
+                    href="/cbt/popular"
+                    className="flex-1 py-2 bg-white border border-green-600 text-green-600 rounded-lg text-sm font-semibold text-center hover:bg-green-50"
+                  >
+                    📊 최다출제
+                  </Link>
                 </div>
               </div>
             ))}
