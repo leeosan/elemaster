@@ -11,6 +11,8 @@ export default function PopularPage() {
   const [questions, setQuestions] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
+  const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
 
   useEffect(() => {
     fetchPopular(selectedSubject)
@@ -23,6 +25,22 @@ export default function PopularPage() {
     const { data } = await supabase.rpc("get_popular_questions", { p_subject: subject })
     setQuestions(data || [])
     setLoading(false)
+  }
+
+  const getSingleAi = async (index: number, question: any) => {
+    setSingleAiLoading(index)
+    try {
+      const res = await fetch("/api/ai-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "single", singleQuestion: question, questions: [], answers: {} })
+      })
+      const data = await res.json()
+      setSingleAi(prev => ({ ...prev, [index]: data.result || "분석 실패" }))
+    } catch {
+      setSingleAi(prev => ({ ...prev, [index]: "AI 분석 서비스가 일시적으로 중단됐습니다." }))
+    }
+    setSingleAiLoading(null)
   }
 
   return (
@@ -57,7 +75,7 @@ export default function PopularPage() {
                   className="w-full text-left p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs bg-blue-100 text-blue-600 font-bold px-2 py-0.5 rounded-full">
                           🔁 {q.cnt}회 출제
                         </span>
@@ -83,6 +101,15 @@ export default function PopularPage() {
                       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-3 text-sm text-gray-700">
                         <p className="font-semibold text-yellow-700 mb-1">📖 해설</p>
                         <p>{q.explanation}</p>
+                      </div>
+                    )}
+                    <button onClick={() => getSingleAi(i, q)} disabled={singleAiLoading === i}
+                      className="mt-3 w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
+                      {singleAiLoading === i ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
+                    </button>
+                    {singleAi[i] && (
+                      <div className="mt-2 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                        {singleAi[i]}
                       </div>
                     )}
                   </div>
