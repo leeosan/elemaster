@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -124,7 +124,7 @@ export default function AdminPage() {
   }
 
   const deleteUser = async (userId: string, email: string) => {
-    if (!confirm(`${email} 회원을 삭제하시겠습니까?`)) return
+    if (!confirm(`${email} ?뚯썝????젣?섏떆寃좎뒿?덇퉴?`)) return
     const res = await fetch("/api/admin/delete-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -132,21 +132,21 @@ export default function AdminPage() {
     })
     if (res.ok) {
       setUsers(prev => prev.filter(u => u.id !== userId))
-      alert("삭제 완료")
+      alert("??젣 ?꾨즺")
     } else {
-      alert("삭제 실패")
+      alert("??젣 ?ㅽ뙣")
     }
   }
 
   const deletePost = async (postId: number, title: string) => {
-    if (!confirm("게시글을 삭제하시겠습니까?")) return
+    if (!confirm("寃뚯떆湲????젣?섏떆寃좎뒿?덇퉴?")) return
     const supabase = createClient()
     await supabase.from("posts").delete().eq("id", postId)
     setPosts(prev => prev.filter(p => p.id !== postId))
   }
 
   const deleteAiSet = async (setNum: number) => {
-    if (!confirm(`AI 추천 문제 ${setNum}을 삭제하시겠습니까?`)) return
+    if (!confirm(`AI 異붿쿇 臾몄젣 ${setNum}????젣?섏떆寃좎뒿?덇퉴?`)) return
     const supabase = createClient()
     await supabase.from("ai_exams").delete().eq("set_number", setNum)
     setAiSets(prev => prev.filter(s => s.set !== setNum))
@@ -154,15 +154,15 @@ export default function AdminPage() {
   }
 
   const regenerateAiSets = async () => {
-    if (!confirm("모든 AI 추천 문제 세트를 재생성하시겠습니까?")) return
+    if (!confirm("紐⑤뱺 AI 異붿쿇 臾몄젣 ?명듃瑜??ъ깮?깊븯?쒓쿋?듬땲源?")) return
     setAiGenerating(true)
     const supabase = createClient()
     await supabase.from("ai_exams").delete().neq("id", 0)
     const subjects = [
-      { name: "전기이론", cnt: 12 }, { name: "전기기기", cnt: 15 },
-      { name: "전력전자", cnt: 7 }, { name: "전기설비", cnt: 11 },
-      { name: "송배전공학", cnt: 5 }, { name: "디지털공학", cnt: 4 },
-      { name: "공업경영", cnt: 6 },
+      { name: "?꾧린?대줎", cnt: 12 }, { name: "?꾧린湲곌린", cnt: 15 },
+      { name: "?꾨젰?꾩옄", cnt: 7 }, { name: "?꾧린?ㅻ퉬", cnt: 11 },
+      { name: "?〓같?꾧났??, cnt: 5 }, { name: "?붿??멸났??, cnt: 4 },
+      { name: "怨듭뾽寃쎌쁺", cnt: 6 },
     ]
     for (let setNum = 1; setNum <= 10; setNum++) {
       let order = 1
@@ -180,7 +180,7 @@ export default function AdminPage() {
     setSelectedAiSet(null)
     setAiSetQuestions([])
     fetchAiSets()
-    alert("AI 추천 문제 10세트 재생성 완료!")
+    alert("AI 異붿쿇 臾몄젣 10?명듃 ?ъ깮???꾨즺!")
   }
 
   const filtered = questions.filter(q =>
@@ -191,7 +191,7 @@ export default function AdminPage() {
 
   const formatDate = (d: string) => {
     if (!d) return "-"
-    return new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
+    return new Date(d).toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
   }
 
   const QuestionTable = ({ data }: { data: any[] }) => (
@@ -199,17 +199,17 @@ export default function AdminPage() {
       <table className="w-full text-sm">
         <thead className="bg-gray-100 text-gray-600 text-xs">
           <tr>
-            <th className="px-4 py-3 text-left w-16">연도/회</th>
-            <th className="px-4 py-3 text-left">문제</th>
-            <th className="px-4 py-3 text-center w-24">출제기준변경</th>
-            <th className="px-4 py-3 text-center w-28">중요도</th>
-            <th className="px-4 py-3 text-center w-16">저장</th>
+            <th className="px-4 py-3 text-left w-16">?곕룄/??/th>
+            <th className="px-4 py-3 text-left">臾몄젣</th>
+            <th className="px-4 py-3 text-center w-24">異쒖젣湲곗?蹂寃?/th>
+            <th className="px-4 py-3 text-center w-28">以묒슂??/th>
+            <th className="px-4 py-3 text-center w-16">???/th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {data.map(q => (
             <tr key={q.id} className={"hover:bg-gray-50 " + (q.is_deprecated ? "bg-red-50" : "")}>
-              <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{q.year}년<br/>{q.round}회</td>
+              <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{q.year}??br/>{q.round}??/td>
               <td className="px-4 py-3 text-gray-700">
                 <span className="text-gray-400 mr-1">{q.question_number}.</span>
                 {q.question_text?.length > 60 ? q.question_text.slice(0, 60) + "..." : q.question_text}
@@ -222,13 +222,13 @@ export default function AdminPage() {
               <td className="px-4 py-3 text-center">
                 <select value={q.importance || ""} onChange={e => updateField(q.id, "importance", e.target.value || null)}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-full">
-                  <option value="">없음</option>
-                  <option value="필수">⭐ 필수</option>
-                  <option value="중요">✨ 중요</option>
+                  <option value="">?놁쓬</option>
+                  <option value="?꾩닔">狩??꾩닔</option>
+                  <option value="以묒슂">??以묒슂</option>
                 </select>
               </td>
               <td className="px-4 py-3 text-center">
-                {saving === q.id ? <span className="text-xs text-blue-500">저장중...</span> : <span className="text-xs text-green-500">✓</span>}
+                {saving === q.id ? <span className="text-xs text-blue-500">??μ쨷...</span> : <span className="text-xs text-green-500">??/span>}
               </td>
             </tr>
           ))}
@@ -239,7 +239,7 @@ export default function AdminPage() {
 
   if (!authorized || loading) return (
     <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400">확인 중...</p>
+      <p className="text-gray-400">?뺤씤 以?..</p>
     </div>
   )
 
@@ -247,13 +247,13 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm sticky top-0 z-10 px-4 py-3">
         <div className="max-w-5xl mx-auto">
-          <h1 className="text-lg font-bold text-gray-800 mb-3">🛠 관리자 대시보드</h1>
+          <h1 className="text-lg font-bold text-gray-800 mb-3">?썱 愿由ъ옄 ??쒕낫??/h1>
           <div className="flex gap-2 mb-3 overflow-x-auto">
             {[
-              { key: "questions", label: "📝 문제 설정" },
-              { key: "ai", label: "🤖 AI 추천 관리" },
-              { key: "users", label: "👥 회원 관리" },
-              { key: "posts", label: "💬 게시판 관리" },
+              { key: "questions", label: "?뱷 臾몄젣 ?ㅼ젙" },
+              { key: "ai", label: "?쨼 AI 異붿쿇 愿由? },
+              { key: "users", label: "?뫁 ?뚯썝 愿由? },
+              { key: "posts", label: "?뮠 寃뚯떆??愿由? },
             ].map(t => (
               <button key={t.key} onClick={() => handleTabChange(t.key)}
                 className={"px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap " + (tab === t.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
@@ -264,28 +264,28 @@ export default function AdminPage() {
 
           {tab === "questions" && (
             <div className="flex gap-2 flex-wrap">
-              <input type="text" placeholder="문제 검색..." value={search} onChange={e => setSearch(e.target.value)}
+              <input type="text" placeholder="臾몄젣 寃??.." value={search} onChange={e => setSearch(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
               <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
-                <option value="">전체 연도</option>
-                {years.map(y => <option key={y} value={y}>{y}년</option>)}
+                <option value="">?꾩껜 ?곕룄</option>
+                {years.map(y => <option key={y} value={y}>{y}??/option>)}
               </select>
-              <span className="text-xs text-gray-400 self-center">{filtered.length}문제</span>
+              <span className="text-xs text-gray-400 self-center">{filtered.length}臾몄젣</span>
             </div>
           )}
           {tab === "users" && (
             <div className="flex gap-2">
-              <input type="text" placeholder="이메일 / 이름 검색..." value={userSearch} onChange={e => setUserSearch(e.target.value)}
+              <input type="text" placeholder="?대찓??/ ?대쫫 寃??.." value={userSearch} onChange={e => setUserSearch(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
-              <span className="text-xs text-gray-400 self-center">총 {filteredUsers.length}명</span>
+              <span className="text-xs text-gray-400 self-center">珥?{filteredUsers.length}紐?/span>
             </div>
           )}
           {tab === "posts" && (
             <div className="flex gap-2">
-              <input type="text" placeholder="제목 / 내용 검색..." value={postSearch} onChange={e => setPostSearch(e.target.value)}
+              <input type="text" placeholder="?쒕ぉ / ?댁슜 寃??.." value={postSearch} onChange={e => setPostSearch(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64" />
-              <span className="text-xs text-gray-400 self-center">총 {filteredPosts.length}개</span>
+              <span className="text-xs text-gray-400 self-center">珥?{filteredPosts.length}媛?/span>
             </div>
           )}
         </div>
@@ -293,26 +293,26 @@ export default function AdminPage() {
 
       <div className="max-w-5xl mx-auto px-4 py-6">
 
-        {/* 문제 설정 */}
+        {/* 臾몄젣 ?ㅼ젙 */}
         {tab === "questions" && <QuestionTable data={filtered} />}
 
-        {/* AI 추천 관리 */}
+        {/* AI 異붿쿇 愿由?*/}
         {tab === "ai" && (
           <div>
-            {/* 세트 목록 */}
+            {/* ?명듃 紐⑸줉 */}
             <div className="bg-white rounded-xl shadow p-5 mb-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="font-bold text-gray-800">🤖 AI 추천 모의고사 세트</h2>
-                  <p className="text-xs text-gray-400 mt-1">세트를 클릭하면 문제를 개별 관리할 수 있어요</p>
+                  <h2 className="font-bold text-gray-800">?쨼 AI 異붿쿇 紐⑥쓽怨좎궗 ?명듃</h2>
+                  <p className="text-xs text-gray-400 mt-1">?명듃瑜??대┃?섎㈃ 臾몄젣瑜?媛쒕퀎 愿由ы븷 ???덉뼱??/p>
                 </div>
                 <button onClick={regenerateAiSets} disabled={aiGenerating}
                   className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-50">
-                  {aiGenerating ? "⏳ 생성 중..." : "🔄 전체 재생성"}
+                  {aiGenerating ? "???앹꽦 以?.." : "?봽 ?꾩껜 ?ъ깮??}
                 </button>
               </div>
               {aiLoading ? (
-                <p className="text-center text-gray-400 text-sm py-8">불러오는 중...</p>
+                <p className="text-center text-gray-400 text-sm py-8">遺덈윭?ㅻ뒗 以?..</p>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {aiSets.map(s => (
@@ -320,12 +320,12 @@ export default function AdminPage() {
                       className={"border rounded-xl p-4 flex items-center justify-between cursor-pointer transition-all " + (selectedAiSet === s.set ? "border-purple-400 bg-purple-50" : "border-gray-200 hover:border-purple-300")}
                       onClick={() => fetchAiSetQuestions(s.set)}>
                       <div>
-                        <p className="font-semibold text-gray-800 text-sm">AI 추천 문제 {s.set}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{s.cnt}문제 {selectedAiSet === s.set ? "· 편집 중 ✏️" : ""}</p>
+                        <p className="font-semibold text-gray-800 text-sm">AI 異붿쿇 臾몄젣 {s.set}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{s.cnt}臾몄젣 {selectedAiSet === s.set ? "쨌 ?몄쭛 以??륅툘" : ""}</p>
                       </div>
                       <button onClick={e => { e.stopPropagation(); deleteAiSet(s.set) }}
                         className="text-xs text-red-500 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">
-                        삭제
+                        ??젣
                       </button>
                     </div>
                   ))}
@@ -333,16 +333,16 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* 선택된 세트 문제 목록 */}
+            {/* ?좏깮???명듃 臾몄젣 紐⑸줉 */}
             {selectedAiSet && (
               <div>
                 <div className="flex items-center gap-3 mb-3">
-                  <h3 className="font-bold text-gray-800">AI 추천 문제 {selectedAiSet} — 개별 설정</h3>
+                  <h3 className="font-bold text-gray-800">AI 異붿쿇 臾몄젣 {selectedAiSet} ??媛쒕퀎 ?ㅼ젙</h3>
                   <button onClick={() => { setSelectedAiSet(null); setAiSetQuestions([]) }}
-                    className="text-xs text-gray-400 hover:text-gray-600">✕ 닫기</button>
+                    className="text-xs text-gray-400 hover:text-gray-600">???リ린</button>
                 </div>
                 {aiSetLoading ? (
-                  <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">불러오는 중...</div>
+                  <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">遺덈윭?ㅻ뒗 以?..</div>
                 ) : (
                   <QuestionTable data={aiSetQuestions} />
                 )}
@@ -351,40 +351,40 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* 회원 관리 */}
+        {/* ?뚯썝 愿由?*/}
         {tab === "users" && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             {usersLoading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+              <div className="text-center py-12 text-gray-400 text-sm">遺덈윭?ㅻ뒗 以?..</div>
             ) : (
               <>
                 <div className="grid grid-cols-3 gap-4 p-5 border-b">
                   <div className="bg-blue-50 rounded-xl p-4 text-center">
                     <p className="text-2xl font-bold text-blue-600">{users.length}</p>
-                    <p className="text-xs text-gray-500 mt-1">전체 회원</p>
+                    <p className="text-xs text-gray-500 mt-1">?꾩껜 ?뚯썝</p>
                   </div>
                   <div className="bg-green-50 rounded-xl p-4 text-center">
                     <p className="text-2xl font-bold text-green-600">
                       {users.filter(u => u.last_sign_in_at && (Date.now() - new Date(u.last_sign_in_at).getTime()) < 7*24*60*60*1000).length}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">최근 7일 활성</p>
+                    <p className="text-xs text-gray-500 mt-1">理쒓렐 7???쒖꽦</p>
                   </div>
                   <div className="bg-purple-50 rounded-xl p-4 text-center">
                     <p className="text-2xl font-bold text-purple-600">
                       {users.filter(u => u.created_at && (Date.now() - new Date(u.created_at).getTime()) < 30*24*60*60*1000).length}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">이번달 신규</p>
+                    <p className="text-xs text-gray-500 mt-1">?대쾲???좉퇋</p>
                   </div>
                 </div>
                 <table className="w-full text-sm">
                   <thead className="bg-gray-100 text-gray-600 text-xs">
                     <tr>
-                      <th className="px-4 py-3 text-left">이메일</th>
-                      <th className="px-4 py-3 text-left w-24">이름</th>
-                      <th className="px-4 py-3 text-center w-24">가입경로</th>
-                      <th className="px-4 py-3 text-center w-28">가입일</th>
-                      <th className="px-4 py-3 text-center w-28">최근 로그인</th>
-                      <th className="px-4 py-3 text-center w-16">삭제</th>
+                      <th className="px-4 py-3 text-left">?대찓??/th>
+                      <th className="px-4 py-3 text-left w-24">?대쫫</th>
+                      <th className="px-4 py-3 text-center w-24">媛?낃꼍濡?/th>
+                      <th className="px-4 py-3 text-center w-28">媛?낆씪</th>
+                      <th className="px-4 py-3 text-center w-28">理쒓렐 濡쒓렇??/th>
+                      <th className="px-4 py-3 text-center w-16">??젣</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -394,14 +394,14 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-gray-600 text-xs">{u.name || "-"}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + (u.provider === "kakao" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600")}>
-                            {u.provider === "kakao" ? "카카오" : "이메일"}
+                            {u.provider === "kakao" ? "移댁뭅?? : "?대찓??}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(u.created_at)}</td>
                         <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(u.last_sign_in_at)}</td>
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => deleteUser(u.id, u.email)}
-                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
+                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">??젣</button>
                         </td>
                       </tr>
                     ))}
@@ -412,22 +412,22 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* 게시판 관리 */}
+        {/* 寃뚯떆??愿由?*/}
         {tab === "posts" && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             {postsLoading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+              <div className="text-center py-12 text-gray-400 text-sm">遺덈윭?ㅻ뒗 以?..</div>
             ) : filteredPosts.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">게시글이 없습니다</div>
+              <div className="text-center py-12 text-gray-400 text-sm">寃뚯떆湲???놁뒿?덈떎</div>
             ) : (
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 text-gray-600 text-xs">
                   <tr>
-                    <th className="px-4 py-3 text-center w-24">카테고리</th>
-                    <th className="px-4 py-3 text-left">제목</th>
-                    <th className="px-4 py-3 text-center w-20">작성자</th>
-                    <th className="px-4 py-3 text-center w-24">작성일</th>
-                    <th className="px-4 py-3 text-center w-16">삭제</th>
+                    <th className="px-4 py-3 text-center w-24">移댄뀒怨좊━</th>
+                    <th className="px-4 py-3 text-left">?쒕ぉ</th>
+                    <th className="px-4 py-3 text-center w-20">?묒꽦??/th>
+                    <th className="px-4 py-3 text-center w-24">?묒꽦??/th>
+                    <th className="px-4 py-3 text-center w-16">??젣</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -435,7 +435,7 @@ export default function AdminPage() {
                     <tr key={p.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-center">
                         <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + (p.category === "free" ? "bg-blue-100 text-blue-600" : p.category === "qna" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700")}>
-                          {p.category === "free" ? "💬 자유" : p.category === "qna" ? "❓ 질문/답변" : "🏆 합격후기"}
+                          {p.category === "free" ? "?뮠 ?먯쑀" : p.category === "qna" ? "??吏덈Ц/?듬?" : "?룇 ?⑷꺽?꾧린"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-700 text-xs">{p.title?.length > 40 ? p.title.slice(0, 40) + "..." : p.title}</td>
@@ -443,7 +443,7 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-center text-xs text-gray-500">{formatDate(p.created_at)}</td>
                       <td className="px-4 py-3 text-center">
                         <button onClick={() => deletePost(p.id, p.title)}
-                          className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
+                          className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">??젣</button>
                       </td>
                     </tr>
                   ))}
