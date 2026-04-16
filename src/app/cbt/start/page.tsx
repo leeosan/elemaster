@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -48,7 +48,7 @@ function CBTStartInner() {
       if (aiset) {
         const { data: aiData } = await supabase.from("ai_exams").select("question_id, question_order").eq("set_number", aiset).order("question_order")
         const ids = (aiData || []).map((r: any) => r.question_id)
-        const { data } = await supabase.from("questions_with_meta").select("*").in("id", ids)
+        const { data } = await supabase.from("questions_with_meta").select("*").in("id", ids).eq("is_deprecated", false)
         const ordered = (aiData || []).map((r: any) => (data || []).find((q: any) => q.id === r.question_id)).filter(Boolean)
         setQuestions(ordered)
         setLoading(false)
