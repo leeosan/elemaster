@@ -3,6 +3,9 @@ import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
 
+// 🔒 관리자 전용 이메일
+const ADMIN_EMAIL = "jaetech01@gmail.com"
+
 function CBTPastInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -10,6 +13,7 @@ function CBTPastInner() {
   const [exams, setExams] = useState<any[]>([])
   const [aiSets, setAiSets] = useState<number[]>([])
   const [authChecked, setAuthChecked] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<"past" | "ai">("past")
 
@@ -18,6 +22,7 @@ function CBTPastInner() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace("/login"); return }
+      setIsAdmin(user.email === ADMIN_EMAIL)
       setAuthChecked(true)
     }
     checkAuth()
@@ -49,18 +54,20 @@ function CBTPastInner() {
       )
       setExams(unique)
 
-      // AI 추천 문제 세트 목록
-      const { data: aiData } = await supabase
-        .from("ai_exams")
-        .select("set_number")
-        .order("set_number")
-      const sets = [...new Set((aiData || []).map((r: any) => r.set_number))]
-      setAiSets(sets)
+      // AI 추천 문제 세트 목록 (관리자 전용)
+      if (isAdmin) {
+        const { data: aiData } = await supabase
+          .from("ai_exams")
+          .select("set_number")
+          .order("set_number")
+        const sets = [...new Set((aiData || []).map((r: any) => r.set_number))]
+        setAiSets(sets)
+      }
 
       setLoading(false)
     }
     fetchAll()
-  }, [examTypeId, authChecked])
+  }, [examTypeId, authChecked, isAdmin])
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -77,25 +84,29 @@ function CBTPastInner() {
         </div>
 
         {/* 탭 */}
-        <div className="flex gap-2 mb-5">
+        <div className="flex gap-2 mb-5 flex-wrap">
           <button
             onClick={() => setTab("past")}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === "past" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}
           >
             📝 과년도 기출문제
           </button>
-          <button
-            onClick={() => setTab("ai")}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === "ai" ? "bg-purple-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}
-          >
-            🤖 AI 추천 문제
-          </button>
-          <button
-            onClick={() => router.push("/cbt/popular")}
-            className="px-4 py-2 rounded-xl text-sm font-semibold transition-all bg-white text-gray-600 border border-gray-200"
-          >
-            📊 최다출제
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setTab("ai")}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === "ai" ? "bg-purple-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}
+            >
+              🤖 AI 추천 문제 <span className="text-xs opacity-70">(관리자)</span>
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => router.push("/cbt/popular")}
+              className="px-4 py-2 rounded-xl text-sm font-semibold transition-all bg-white text-gray-600 border border-gray-200"
+            >
+              📊 최다출제 <span className="text-xs opacity-70">(관리자)</span>
+            </button>
+          )}
         </div>
 
         {/* 과년도 기출문제 */}
@@ -124,11 +135,11 @@ function CBTPastInner() {
           </div>
         )}
 
-        {/* AI 추천 문제 */}
-        {tab === "ai" && (
+        {/* AI 추천 문제 (관리자 전용) */}
+        {tab === "ai" && isAdmin && (
           <div>
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
-              <p className="text-purple-700 text-sm font-semibold mb-1">🤖 AI 추천 모의고사란?</p>
+              <p className="text-purple-700 text-sm font-semibold mb-1">🤖 AI 추천 모의고사 (관리자 전용)</p>
               <p className="text-purple-600 text-xs leading-relaxed">
                 2019~2025년 최신 기출 문제를 실제 출제 비중에 맞게 선별한 모의고사예요.<br/>
                 전기이론 12문제 · 전기기기 15문제 · 전력전자 7문제 · 전기설비 11문제 · 송배전공학 5문제 · 디지털공학 4문제 · 공업경영 6문제
