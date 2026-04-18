@@ -1,7 +1,9 @@
-"use client"
+﻿"use client"
 import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
+
+const ADMIN_EMAIL = "jaetech01@gmail.com"
 
 function CBTStartInner() {
   const searchParams = useSearchParams()
@@ -40,6 +42,12 @@ function CBTStartInner() {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.replace("/login"); return }
+      // aiset 파라미터는 관리자 전용
+      if (aiset && data.user.email !== ADMIN_EMAIL) {
+        alert("AI 추천 모의고사는 관리자 전용입니다.")
+        router.replace("/cbt/past")
+        return
+      }
       setUser(data.user)
       const { data: bData } = await supabase.from("bookmarks").select("question_id").eq("user_id", data.user.id)
       setBookmarks(new Set((bData || []).map((b: any) => b.question_id)))
