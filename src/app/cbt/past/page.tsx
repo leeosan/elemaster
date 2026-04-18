@@ -130,7 +130,7 @@ function CBTPastInner() {
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
               <p className="text-purple-700 text-sm font-semibold mb-1">🤖 AI 추천 모의고사란?</p>
               <p className="text-purple-600 text-xs leading-relaxed">
-                2019~2022년 최신 기출 문제를 실제 출제 비중에 맞게 선별한 모의고사예요.<br/>
+                2019~2025년 최신 기출 문제를 실제 출제 비중에 맞게 선별한 모의고사예요.<br/>
                 전기이론 12문제 · 전기기기 15문제 · 전력전자 7문제 · 전기설비 11문제 · 송배전공학 5문제 · 디지털공학 4문제 · 공업경영 6문제
               </p>
             </div>
@@ -145,7 +145,7 @@ function CBTPastInner() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-gray-800">AI 추천 문제 {setNum}</p>
-                      <p className="text-sm text-gray-400 mt-0.5">60문제 · 60분 · 2019~2022년 최신 기출</p>
+                      <p className="text-sm text-gray-400 mt-0.5">60문제 · 60분 · 2019~2025년 최신 기출</p>
                     </div>
                     <span className="text-purple-500 text-lg">→</span>
                   </div>
