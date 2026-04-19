@@ -118,11 +118,15 @@ export default function AdminPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from("question_topics")
-      .select("relevance, questions(id, year, round, question_number, question_text, subject)")
+      .select("question_id, relevance")
       .eq("topic_id", topicId)
       .order("relevance", { ascending: false })
       .limit(15)
-    setTopicQuestions(data || [])
+    if (!data || data.length === 0) { setTopicQuestions([]); setQuestionsLoading(false); return }
+    const ids = data.map((r: any) => r.question_id)
+    const { data: qData } = await supabase.from("questions").select("id, year, round, question_number, question_text, subject").in("id", ids)
+    const merged = data.map((qt: any) => ({ relevance: qt.relevance, questions: (qData || []).find((q: any) => q.id === qt.question_id) })).filter((r: any) => r.questions)
+    setTopicQuestions(merged)
     setQuestionsLoading(false)
   }
 
