@@ -115,6 +115,7 @@ export default function AdminPage() {
     }
     setExpandedTopic(topicId)
     setQuestionsLoading(true)
+    console.log("DEBUG topicId:", topicId)
     const supabase = createClient()
     const { data } = await supabase
       .from("question_topics")
