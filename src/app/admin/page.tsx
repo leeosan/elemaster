@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -252,6 +252,7 @@ export default function AdminPage() {
             {[
               { key: "questions", label: "📝 문제 설정" },
               { key: "ai", label: "🤖 AI 추천 관리" },
+              { key: "topics", label: "📊 빈출 분석" },
               { key: "users", label: "👥 회원 관리" },
               { key: "posts", label: "💬 게시판 관리" },
             ].map(t => (
