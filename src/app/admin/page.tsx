@@ -26,6 +26,9 @@ export default function AdminPage() {
   const [topicSubject, setTopicSubject] = useState("전기이론")
   const [topicData, setTopicData] = useState<any[]>([])
   const [topicLoading, setTopicLoading] = useState(false)
+  const [expandedTopic, setExpandedTopic] = useState<number | null>(null)
+  const [topicQuestions, setTopicQuestions] = useState<any[]>([])
+  const [questionsLoading, setQuestionsLoading] = useState(false)
   const [selectedAiSet, setSelectedAiSet] = useState<number | null>(null)
   const [aiSetQuestions, setAiSetQuestions] = useState<any[]>([])
   const [aiSetLoading, setAiSetLoading] = useState(false)
@@ -102,6 +105,25 @@ export default function AdminPage() {
       .limit(30)
     setTopicData(data || [])
     setTopicLoading(false)
+  }
+
+  const fetchTopicQuestions = async (topicId: number) => {
+    if (expandedTopic === topicId) {
+      setExpandedTopic(null)
+      setTopicQuestions([])
+      return
+    }
+    setExpandedTopic(topicId)
+    setQuestionsLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("question_topics")
+      .select("relevance, questions(id, year, round, question_number, question_text, subject)")
+      .eq("topic_id", topicId)
+      .order("relevance", { ascending: false })
+      .limit(15)
+    setTopicQuestions(data || [])
+    setQuestionsLoading(false)
   }
 
   const fetchAiSetQuestions = async (setNum: number) => {
@@ -422,6 +444,38 @@ export default function AdminPage() {
                             className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
                         </td>
                       </tr>
+                      {expandedTopic === t.id && (
+                        <tr>
+                          <td colSpan={6} className="bg-gray-50 p-4">
+                            {questionsLoading ? (
+                              <p className="text-center text-gray-400 text-xs py-4">문제 불러오는 중...</p>
+                            ) : topicQuestions.length === 0 ? (
+                              <p className="text-center text-gray-400 text-xs py-4">관련 문제가 없습니다</p>
+                            ) : (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-600 mb-2">📝 관련 문제 (확신도 높은 순, 최대 15개)</p>
+                                <div className="space-y-1">
+                                  {topicQuestions.map((tq: any) => (
+                                    <div key={tq.questions?.id} className="bg-white rounded-lg p-2 text-xs flex items-start gap-3 border border-gray-100">
+                                      <span className="text-gray-400 font-mono whitespace-nowrap">
+                                        {tq.questions?.year}년 {tq.questions?.round}회 {tq.questions?.question_number}번
+                                      </span>
+                                      <span className="text-gray-700 flex-1 line-clamp-2">
+                                        {tq.questions?.question_text?.length > 100
+                                          ? tq.questions.question_text.slice(0, 100) + "..."
+                                          : tq.questions?.question_text}
+                                      </span>
+                                      <span className="text-blue-600 font-semibold whitespace-nowrap">
+                                        {(tq.relevance * 100).toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
                     ))}
                   </tbody>
                 </table>
@@ -472,7 +526,7 @@ export default function AdminPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {topicData.map((t: any, i: number) => (
-                      <tr key={t.id} className={"hover:bg-gray-50 " + (i < 5 ? "bg-yellow-50" : i < 10 ? "bg-blue-50" : "")}>
+                      <tr key={t.id} onClick={() => fetchTopicQuestions(t.id)} className={"hover:bg-gray-50 cursor-pointer " + (i < 5 ? "bg-yellow-50" : i < 10 ? "bg-blue-50" : "") + (expandedTopic === t.id ? " bg-indigo-100" : "")}>
                         <td className="px-3 py-2 text-center font-bold">
                           {i < 3 ? (i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉") : (i + 1)}
                         </td>
