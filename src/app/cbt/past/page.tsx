@@ -99,14 +99,12 @@ function CBTPastInner() {
               🤖 AI 추천 문제 <span className="text-xs opacity-70">(관리자)</span>
             </button>
           )}
-          {isAdmin && (
             <button
               onClick={() => router.push("/cbt/popular")}
               className="px-4 py-2 rounded-xl text-sm font-semibold transition-all bg-white text-gray-600 border border-gray-200"
             >
-              📊 최다출제 <span className="text-xs opacity-70">(관리자)</span>
+              📊 최다출제 {isAdmin && <span className="text-xs opacity-70">(관리자)</span>}
             </button>
-          )}
         </div>
 
         {/* 과년도 기출문제 */}
