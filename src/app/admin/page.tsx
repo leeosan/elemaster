@@ -127,6 +127,18 @@ export default function AdminPage() {
     if (!data || data.length === 0) { setTopicQuestions([]); setQuestionsLoading(false); return }
     const ids = data.map((r: any) => r.question_id)
     const { data: qData } = await supabase.from("questions").select("id, year, round, question_number, question_text, subject, option_1, option_2, option_3, option_4, answer, explanation").in("id", ids)
+    const { data: aiExpl } = await supabase.from("ai_explanations").select("question_id, content").in("question_id", ids)
+    const aiMap = new Map((aiExpl || []).map((e: any) => [e.question_id, e.content]))
+    if (qData) {
+      qData.forEach((q: any) => {
+        if (!q.explanation && aiMap.has(q.id)) {
+          q.explanation = aiMap.get(q.id)
+          q.explanation_source = "ai"
+        } else if (q.explanation) {
+          q.explanation_source = "original"
+        }
+      })
+    }
     const merged = data.map((qt: any) => ({ relevance: qt.relevance, questions: (qData || []).find((q: any) => q.id === qt.question_id) })).filter((r: any) => r.questions)
     setTopicQuestions(merged)
     setQuestionsLoading(false)
@@ -568,7 +580,7 @@ export default function AdminPage() {
                                           </div>
                                           {tq.questions?.explanation && (
                                             <div>
-                                              <p className="text-xs font-semibold text-gray-600 mb-1">💡 해설</p>
+                                              <p className="text-xs font-semibold text-gray-600 mb-1">💡 해설 {tq.questions?.explanation_source === "ai" ? (<span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded ml-1">🤖 AI</span>) : (<span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded ml-1">원본</span>)}</p>
                                               <p className="text-sm text-gray-700 whitespace-pre-line bg-white p-2 rounded border border-gray-200">
                                                 {tq.questions.explanation}
                                               </p>
