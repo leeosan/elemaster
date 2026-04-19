@@ -16,6 +16,7 @@ export default function PopularPage() {
   const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
   const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -25,11 +26,7 @@ export default function PopularPage() {
         router.replace("/login")
         return
       }
-      if (user.email !== ADMIN_EMAIL) {
-        alert("관리자 전용 페이지입니다.")
-        router.replace("/cbt/past")
-        return
-      }
+      setIsAdmin(user.email === ADMIN_EMAIL)
       setAuthChecked(true)
     }
     checkAdmin()
@@ -44,7 +41,8 @@ export default function PopularPage() {
     setLoading(true)
     setExpanded(null)
     const supabase = createClient()
-    const { data } = await supabase.rpc("get_popular_questions", { p_subject: subject })
+    const funcName = isAdmin ? "get_popular_questions" : "get_popular_questions_public"
+    const { data } = await supabase.rpc(funcName, { p_subject: subject })
     setQuestions(data || [])
     setLoading(false)
   }
