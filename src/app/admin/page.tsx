@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
@@ -444,35 +444,6 @@ export default function AdminPage() {
                             className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
                         </td>
                       </tr>
-                      {expandedTopic === t.id && (
-                        <tr>
-                          <td colSpan={6} className="bg-gray-50 p-4">
-                            {questionsLoading ? (
-                              <p className="text-center text-gray-400 text-xs py-4">문제 불러오는 중...</p>
-                            ) : topicQuestions.length === 0 ? (
-                              <p className="text-center text-gray-400 text-xs py-4">관련 문제가 없습니다</p>
-                            ) : (
-                              <div>
-                                <p className="text-xs font-semibold text-gray-600 mb-2">📝 관련 문제 (확신도 높은 순, 최대 15개)</p>
-                                <div className="space-y-1">
-                                  {topicQuestions.map((tq: any) => (
-                                    <div key={tq.questions?.id} className="bg-white rounded-lg p-2 text-xs flex items-start gap-3 border border-gray-100">
-                                      <span className="text-gray-400 font-mono whitespace-nowrap">
-                                        {tq.questions?.year}년 {tq.questions?.round}회 {tq.questions?.question_number}번
-                                      </span>
-                                      <span className="text-gray-700 flex-1 line-clamp-2">
-                                        {tq.questions?.question_text?.length > 100
-                                          ? tq.questions.question_text.slice(0, 100) + "..."
-                                          : tq.questions?.question_text}
-                                      </span>
-                                      <span className="text-blue-600 font-semibold whitespace-nowrap">
-                                        {(tq.relevance * 100).toFixed(0)}%
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                           </td>
                         </tr>
                       )}
@@ -526,7 +497,8 @@ export default function AdminPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {topicData.map((t: any, i: number) => (
-                      <tr key={t.id} onClick={() => fetchTopicQuestions(t.id)} className={"hover:bg-gray-50 cursor-pointer " + (i < 5 ? "bg-yellow-50" : i < 10 ? "bg-blue-50" : "") + (expandedTopic === t.id ? " bg-indigo-100" : "")}>
+                      <React.Fragment key={t.id}>
+                        <tr onClick={() => fetchTopicQuestions(t.id)} className={"hover:bg-gray-50 cursor-pointer " + (i < 5 ? "bg-yellow-50" : i < 10 ? "bg-blue-50" : "") + (expandedTopic === t.id ? " bg-indigo-100" : "")}>
                         <td className="px-3 py-2 text-center font-bold">
                           {i < 3 ? (i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉") : (i + 1)}
                         </td>
@@ -544,6 +516,37 @@ export default function AdminPage() {
                           <span className="text-xs text-gray-600">{t.importance || "-"}</span>
                         </td>
                       </tr>
+                      {expandedTopic === t.id && (
+                        <tr key={"exp-" + t.id}>
+                          <td colSpan={6} className="bg-gray-50 p-4">
+                            {questionsLoading ? (
+                              <p className="text-center text-gray-400 text-xs py-4">문제 불러오는 중...</p>
+                            ) : topicQuestions.length === 0 ? (
+                              <p className="text-center text-gray-400 text-xs py-4">관련 문제가 없습니다</p>
+                            ) : (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-600 mb-2">📝 관련 문제 (확신도 높은 순, 최대 15개)</p>
+                                <div className="space-y-1">
+                                  {topicQuestions.map((tq: any) => (
+                                    <div key={tq.questions?.id} className="bg-white rounded-lg p-2 text-xs flex items-start gap-3 border border-gray-100">
+                                      <span className="text-gray-400 font-mono whitespace-nowrap">
+                                        {tq.questions?.year}년 {tq.questions?.round}회 {tq.questions?.question_number}번
+                                      </span>
+                                      <span className="text-gray-700 flex-1">
+                                        {tq.questions?.question_text?.length > 100 ? tq.questions.question_text.slice(0, 100) + "..." : tq.questions?.question_text}
+                                      </span>
+                                      <span className="text-blue-600 font-semibold whitespace-nowrap">
+                                        {(tq.relevance * 100).toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
