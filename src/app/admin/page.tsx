@@ -23,6 +23,9 @@ export default function AdminPage() {
   const [aiSets, setAiSets] = useState<any[]>([])
   const [aiLoading, setAiLoading] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [topicSubject, setTopicSubject] = useState("전기이론")
+  const [topicData, setTopicData] = useState<any[]>([])
+  const [topicLoading, setTopicLoading] = useState(false)
   const [selectedAiSet, setSelectedAiSet] = useState<number | null>(null)
   const [aiSetQuestions, setAiSetQuestions] = useState<any[]>([])
   const [aiSetLoading, setAiSetLoading] = useState(false)
@@ -88,6 +91,19 @@ export default function AdminPage() {
     setAiLoading(false)
   }
 
+  const fetchTopics = async (subject: string) => {
+    setTopicLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("top_frequent_topics")
+      .select("id, subject, chapter, topic, frequency, importance, last_year")
+      .eq("subject", subject)
+      .order("frequency", { ascending: false })
+      .limit(30)
+    setTopicData(data || [])
+    setTopicLoading(false)
+  }
+
   const fetchAiSetQuestions = async (setNum: number) => {
     setAiSetLoading(true)
     setSelectedAiSet(setNum)
@@ -112,6 +128,7 @@ export default function AdminPage() {
     if (t === "users") fetchUsers()
     if (t === "posts") fetchPosts()
     if (t === "ai") fetchAiSets()
+    if (t === "topics") fetchTopics(topicSubject)
   }
 
   const updateField = async (id: number, field: string, value: any) => {
@@ -410,6 +427,74 @@ export default function AdminPage() {
                 </table>
               </>
             )}
+          </div>
+        )}
+
+        {/* 빈출 분석 */}
+        {tab === "topics" && (
+          <div>
+            <div className="bg-white rounded-xl shadow p-5 mb-4">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <div>
+                  <h2 className="font-bold text-gray-800">📊 과목별 빈출 TOP 30</h2>
+                  <p className="text-xs text-gray-400 mt-1">AI가 분석한 기출문제 출제 빈도 순위입니다</p>
+                </div>
+                <select
+                  value={topicSubject}
+                  onChange={(e) => { setTopicSubject(e.target.value); fetchTopics(e.target.value) }}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium"
+                >
+                  <option value="전기이론">전기이론</option>
+                  <option value="전기기기">전기기기</option>
+                  <option value="전기설비">전기설비</option>
+                  <option value="송배전공학">송배전공학</option>
+                  <option value="디지털공학">디지털공학</option>
+                  <option value="전력전자">전력전자</option>
+                  <option value="공업경영">공업경영</option>
+                </select>
+              </div>
+
+              {topicLoading ? (
+                <p className="text-center text-gray-400 text-sm py-8">불러오는 중...</p>
+              ) : topicData.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm py-8">데이터가 없습니다</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 text-gray-600 text-xs">
+                    <tr>
+                      <th className="px-3 py-2 text-center w-12">순위</th>
+                      <th className="px-3 py-2 text-left w-28">대주제</th>
+                      <th className="px-3 py-2 text-left">소주제</th>
+                      <th className="px-3 py-2 text-center w-20">출제빈도</th>
+                      <th className="px-3 py-2 text-center w-20">최근출제</th>
+                      <th className="px-3 py-2 text-center w-16">중요도</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {topicData.map((t: any, i: number) => (
+                      <tr key={t.id} className={"hover:bg-gray-50 " + (i < 5 ? "bg-yellow-50" : i < 10 ? "bg-blue-50" : "")}>
+                        <td className="px-3 py-2 text-center font-bold">
+                          {i < 3 ? (i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉") : (i + 1)}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-600">{t.chapter}</td>
+                        <td className="px-3 py-2 text-gray-800 font-medium">{t.topic}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="inline-block bg-blue-100 text-blue-700 text-xs font-bold rounded-full px-3 py-1">
+                            {t.frequency}회
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center text-xs text-gray-500">
+                          {t.last_year ? t.last_year + "년" : "-"}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="text-xs text-gray-600">{t.importance || "-"}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
 
