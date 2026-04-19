@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [expandedTopic, setExpandedTopic] = useState<number | null>(null)
   const [topicQuestions, setTopicQuestions] = useState<any[]>([])
   const [questionsLoading, setQuestionsLoading] = useState(false)
+  const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null)
   const [selectedAiSet, setSelectedAiSet] = useState<number | null>(null)
   const [aiSetQuestions, setAiSetQuestions] = useState<any[]>([])
   const [aiSetLoading, setAiSetLoading] = useState(false)
@@ -125,7 +126,7 @@ export default function AdminPage() {
       .limit(15)
     if (!data || data.length === 0) { setTopicQuestions([]); setQuestionsLoading(false); return }
     const ids = data.map((r: any) => r.question_id)
-    const { data: qData } = await supabase.from("questions").select("id, year, round, question_number, question_text, subject").in("id", ids)
+    const { data: qData } = await supabase.from("questions").select("id, year, round, question_number, question_text, subject, option_1, option_2, option_3, option_4, answer, explanation").in("id", ids)
     const merged = data.map((qt: any) => ({ relevance: qt.relevance, questions: (qData || []).find((q: any) => q.id === qt.question_id) })).filter((r: any) => r.questions)
     setTopicQuestions(merged)
     setQuestionsLoading(false)
@@ -530,16 +531,51 @@ export default function AdminPage() {
                                 <p className="text-xs font-semibold text-gray-600 mb-2">📝 관련 문제 (확신도 높은 순, 최대 15개)</p>
                                 <div className="space-y-1">
                                   {topicQuestions.map((tq: any) => (
-                                    <div key={tq.questions?.id} className="bg-white rounded-lg p-2 text-xs flex items-start gap-3 border border-gray-100">
-                                      <span className="text-gray-400 font-mono whitespace-nowrap">
-                                        {tq.questions?.year}년 {tq.questions?.round}회 {tq.questions?.question_number}번
-                                      </span>
-                                      <span className="text-gray-700 flex-1">
-                                        {tq.questions?.question_text?.length > 100 ? tq.questions.question_text.slice(0, 100) + "..." : tq.questions?.question_text}
-                                      </span>
-                                      <span className="text-blue-600 font-semibold whitespace-nowrap">
-                                        {(tq.relevance * 100).toFixed(0)}%
-                                      </span>
+                                    <div key={tq.questions?.id} className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+                                      <div
+                                        onClick={() => setExpandedQuestion(expandedQuestion === tq.questions?.id ? null : tq.questions?.id)}
+                                        className={"p-2 text-xs flex items-start gap-3 cursor-pointer hover:bg-blue-50 " + (expandedQuestion === tq.questions?.id ? "bg-blue-50" : "")}
+                                      >
+                                        <span className="text-gray-400 font-mono whitespace-nowrap">
+                                          {tq.questions?.year}년 {tq.questions?.round}회 {tq.questions?.question_number}번
+                                        </span>
+                                        <span className="text-gray-700 flex-1">
+                                          {tq.questions?.question_text?.length > 100 ? tq.questions.question_text.slice(0, 100) + "..." : tq.questions?.question_text}
+                                        </span>
+                                        <span className="text-blue-600 font-semibold whitespace-nowrap">
+                                          {(tq.relevance * 100).toFixed(0)}%
+                                        </span>
+                                        <span className="text-gray-400 text-xs">
+                                          {expandedQuestion === tq.questions?.id ? "▲" : "▼"}
+                                        </span>
+                                      </div>
+                                      {expandedQuestion === tq.questions?.id && (
+                                        <div className="p-3 bg-gray-50 border-t border-gray-200 space-y-3">
+                                          <div>
+                                            <p className="text-xs font-semibold text-gray-600 mb-1">📝 전체 문제</p>
+                                            <p className="text-sm text-gray-800 whitespace-pre-line">{tq.questions?.question_text}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-xs font-semibold text-gray-600 mb-1">보기</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-sm">
+                                              {[tq.questions?.option_1, tq.questions?.option_2, tq.questions?.option_3, tq.questions?.option_4].map((opt, idx) => (
+                                                <div key={idx} className={"px-2 py-1 rounded " + (tq.questions?.answer === idx + 1 ? "bg-green-100 text-green-800 font-semibold" : "text-gray-700")}>
+                                                  {["①", "②", "③", "④"][idx]} {opt || "-"}
+                                                  {tq.questions?.answer === idx + 1 && " ✓"}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                          {tq.questions?.explanation && (
+                                            <div>
+                                              <p className="text-xs font-semibold text-gray-600 mb-1">💡 해설</p>
+                                              <p className="text-sm text-gray-700 whitespace-pre-line bg-white p-2 rounded border border-gray-200">
+                                                {tq.questions.explanation}
+                                              </p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
