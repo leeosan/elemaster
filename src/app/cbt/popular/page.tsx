@@ -76,7 +76,7 @@ export default function PopularPage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
           <button onClick={() => router.back()} className="text-gray-500 text-sm mb-3 hover:text-gray-700">← 뒤로</button>
-          <h1 className="text-2xl font-bold text-gray-800">📊 과목별 최다출제문제 <span className="text-sm text-red-500">(관리자)</span></h1>
+          <h1 className="text-2xl font-bold text-gray-800">📊 과목별 최다출제문제 {isAdmin && <span className="text-sm text-red-500">(관리자)</span>}</h1>
           <p className="text-gray-500 text-sm mt-1">2회 이상 출제된 문제 모음</p>
         </div>
 
