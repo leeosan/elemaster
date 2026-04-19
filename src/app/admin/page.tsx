@@ -444,9 +444,6 @@ export default function AdminPage() {
                             className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">삭제</button>
                         </td>
                       </tr>
-                          </td>
-                        </tr>
-                      )}
                     ))}
                   </tbody>
                 </table>
