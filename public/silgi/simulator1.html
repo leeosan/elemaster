@@ -3041,13 +3041,16 @@ window.addEventListener("message", (ev) => {
       console.log("[LOAD_PROGRESS] received:", ev.data.payload);
     try {
       const records = ev.data.payload || [];
-      records.forEach(r => {
-        const key = `phase_custom_answer_${r.phase}`;
-        if (r.wire_data) {
-          localStorage.setItem(key, JSON.stringify({ wires: r.wire_data }));
-        }
-      });
-      if (typeof loadSavedAnswer === "function") loadSavedAnswer();
+      const current = records.find(r => String(r.phase) === String(currentPhase));
+      if (current && Array.isArray(current.wire_data) && current.wire_data.length > 0) {
+        console.log("[LOAD_PROGRESS] restoring", current.wire_data.length, "wires for phase", currentPhase);
+        wires.length = 0;
+        current.wire_data.forEach(w => wires.push(w));
+        if (typeof drawWires === "function") drawWires();
+        if (typeof updateProgress === "function") updateProgress();
+      } else {
+        console.log("[LOAD_PROGRESS] no wires to restore");
+      }
     } catch(e) { console.error("LOAD_PROGRESS error:", e); }
   }
 });
