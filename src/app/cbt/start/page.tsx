@@ -3,12 +3,15 @@ import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
 
+const ADMIN_EMAIL = "jaetech01@gmail.com"
+
 function CBTStartInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const examId = searchParams.get("exam") || "1"
   const year = searchParams.get("year")
   const round = searchParams.get("round")
+  const aiset = searchParams.get("aiset")
 
   const [questions, setQuestions] = useState<any[]>([])
   const [current, setCurrent] = useState(0)
@@ -22,20 +25,30 @@ function CBTStartInner() {
   const [aiLoading, setAiLoading] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
-
   const [showNotes, setShowNotes] = useState(false)
   const [notes, setNotes] = useState<any[]>([])
   const [myNote, setMyNote] = useState("")
   const [notesLoading, setNotesLoading] = useState(false)
   const [noteSaving, setNoteSaving] = useState(false)
   const [likedNotes, setLikedNotes] = useState<Set<number>>(new Set())
+  const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
+  const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
+
+  // 신규: 문제 네비게이션 상태
+  const [showNav, setShowNav] = useState(false)
+  const [navSearch, setNavSearch] = useState("")
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.replace("/login"); return }
+      // aiset 파라미터는 관리자 전용
+      if (aiset && data.user.email !== ADMIN_EMAIL) {
+        alert("AI 추천 모의고사는 관리자 전용입니다.")
+        router.replace("/cbt/past")
+        return
+      }
       setUser(data.user)
-      // 북마크 불러오기
       const { data: bData } = await supabase.from("bookmarks").select("question_id").eq("user_id", data.user.id)
       setBookmarks(new Set((bData || []).map((b: any) => b.question_id)))
     })
@@ -43,16 +56,28 @@ function CBTStartInner() {
 
   useEffect(() => {
     const supabase = createClient()
-    let query = supabase.from("questions_with_meta").select("*").eq("exam_type_id", examId)
-    if (year && round) query = query.eq("year", year).eq("round", round)
-    query.limit(60).then(({ data }) => {
-      const sorted = year && round
-        ? (data || []).sort((a: any, b: any) => a.question_number - b.question_number)
-        : (data || []).sort(() => Math.random() - 0.5)
-      setQuestions(sorted)
-      setLoading(false)
-    })
-  }, [examId, year, round])
+    const load = async () => {
+      if (aiset) {
+        const { data: aiData } = await supabase.from("ai_exams").select("question_id, question_order").eq("set_number", aiset).order("question_order")
+        const ids = (aiData || []).map((r: any) => r.question_id)
+        const { data } = await supabase.from("questions_with_meta").select("*").in("id", ids).eq("is_deprecated", false)
+        const ordered = (aiData || []).map((r: any) => (data || []).find((q: any) => q.id === r.question_id)).filter(Boolean)
+        setQuestions(ordered)
+        setLoading(false)
+      } else {
+        let query = supabase.from("questions_with_meta").select("*").eq("exam_type_id", examId)
+        if (year && round) query = query.eq("year", year).eq("round", round)
+        query.limit(60).then(({ data }) => {
+          const sorted = year && round
+            ? (data || []).sort((a: any, b: any) => a.question_number - b.question_number)
+            : (data || []).sort(() => Math.random() - 0.5)
+          setQuestions(sorted)
+          setLoading(false)
+        })
+      }
+    }
+    load()
+  }, [examId, year, round, aiset])
 
   useEffect(() => {
     if (finished || loading) return
@@ -122,10 +147,23 @@ function CBTStartInner() {
     }
   }
 
+  const getSingleAi = async (index: number, question: any) => {
+    setSingleAiLoading(index)
+    try {
+      const res = await fetch("/api/ai-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "single", singleQuestion: question, questions: [], answers: {} })
+      })
+      const data = await res.json()
+      setSingleAi(prev => ({ ...prev, [index]: data.result || "분석 실패" }))
+    } catch { setSingleAi(prev => ({ ...prev, [index]: "AI 분석 서비스가 일시적으로 중단됐습니다." })) }
+    setSingleAiLoading(null)
+  }
+
   const getAiAnalysis = async () => {
     setAiLoading(true)
     setAiAnalysis("")
-    const wrongQs = questions.filter((q: any, i: number) => answers[i] !== q.answer)
     try {
       const res = await fetch("/api/ai-analysis", {
         method: "POST",
@@ -149,7 +187,6 @@ function CBTStartInner() {
         solved_at: new Date().toISOString()
       }, { onConflict: "user_id,question_id" })
     }
-    // 학습 기록 저장 (스트릭용)
     const { correct } = getScore()
     await supabase.from("study_logs").upsert({
       user_id: user.id,
@@ -183,6 +220,96 @@ function CBTStartInner() {
     if (finished) return
     setAnswers(prev => ({ ...prev, [current]: num }))
     setShowExplanation(false)
+  }
+
+  // 번호 검색 → 해당 문제로 이동
+  const handleNavSearch = () => {
+    const n = parseInt(navSearch)
+    if (!isNaN(n) && n >= 1 && n <= questions.length) {
+      moveTo(n - 1)
+      setShowNav(false)
+      setNavSearch("")
+    }
+  }
+
+  // 문제 번호 네비게이션 사이드바 (데스크톱/모바일 공용)
+  const NavigationPanel = () => {
+    const answeredCount = Object.keys(answers).length
+    const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0
+    const groups: number[][] = []
+    for (let i = 0; i < questions.length; i += 10) {
+      groups.push(Array.from({length: Math.min(10, questions.length - i)}, (_, j) => i + j))
+    }
+    return (
+      <div className="bg-white rounded-xl shadow p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-gray-800 text-sm">📋 문제 번호</h3>
+          <button onClick={() => setShowNav(false)} className="lg:hidden text-gray-400 text-2xl leading-none">×</button>
+        </div>
+
+        <div className="flex gap-2 mb-3">
+          <input
+            type="number"
+            min="1"
+            max={questions.length}
+            value={navSearch}
+            onChange={e => setNavSearch(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleNavSearch()}
+            placeholder={`1-${questions.length}`}
+            className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+          />
+          <button onClick={handleNavSearch}
+            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 flex-shrink-0">
+            이동
+          </button>
+        </div>
+
+        <div className="text-xs text-gray-500 mb-1.5">풀이 진행: {answeredCount}/{questions.length} ({progress}%)</div>
+        <div className="bg-gray-200 rounded-full h-1.5 mb-4">
+          <div className="bg-blue-600 h-1.5 rounded-full transition-all" style={{ width: `${progress}%` }} />
+        </div>
+
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3 text-xs text-gray-500">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-600 rounded"></span>현재</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 border border-green-400 rounded"></span>완료</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-100 border border-gray-300 rounded"></span>미답</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-white border-2 border-yellow-400 rounded"></span>북마크</span>
+        </div>
+
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          {groups.map((grp, gIdx) => {
+            const start = gIdx * 10 + 1
+            const end = Math.min(start + 9, questions.length)
+            return (
+              <div key={gIdx}>
+                <div className="text-xs text-gray-400 font-semibold mb-1.5">{start}-{end}</div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {grp.map(idx => {
+                    const isAnswered = answers[idx] !== undefined
+                    const isCurrent = idx === current
+                    const isBookmarked = questions[idx] && bookmarks.has(questions[idx].id)
+                    let cls = "aspect-square rounded-lg text-xs font-bold border transition-all flex items-center justify-center "
+                    if (isCurrent) cls += "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-300 "
+                    else if (isAnswered) cls += "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 "
+                    else cls += "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200 "
+                    if (isBookmarked && !isCurrent) cls += "ring-2 ring-yellow-400 "
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => { moveTo(idx); setShowNav(false) }}
+                        className={cls}
+                      >
+                        {idx + 1}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400">문제 불러오는 중...</p></div>
@@ -259,9 +386,18 @@ function CBTStartInner() {
                           ))}
                         </div>
                         {q.explanation && (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-gray-700">
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-gray-700 mb-3">
                             <p className="font-semibold text-yellow-700 mb-1">📖 해설</p>
                             <p>{q.explanation}</p>
+                          </div>
+                        )}
+                        <button onClick={() => getSingleAi(i + 1000, q)} disabled={singleAiLoading === i + 1000}
+                          className="w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
+                          {singleAiLoading === i + 1000 ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
+                        </button>
+                        {singleAi[i + 1000] && (
+                          <div className="mt-2 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                            {singleAi[i + 1000]}
                           </div>
                         )}
                       </div>
@@ -281,135 +417,177 @@ function CBTStartInner() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm sticky top-0 z-10 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
           <span className="text-sm font-semibold text-gray-600">{current + 1} / {questions.length}</span>
           <span className={`text-lg font-bold ${timeLeft < 300 ? "text-red-500" : "text-blue-600"}`}>⏱ {formatTime(timeLeft)}</span>
           <button onClick={async () => { setFinished(true); await saveWrongAnswers() }} className="text-sm bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600">제출</button>
         </div>
-        <div className="max-w-2xl mx-auto mt-2 bg-gray-200 rounded-full h-1.5">
+        <div className="max-w-6xl mx-auto mt-2 bg-gray-200 rounded-full h-1.5">
           <div className="bg-blue-600 h-1.5 rounded-full transition-all" style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {q.is_deprecated && (
-          <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-3 flex items-start gap-2">
-            <span className="text-red-500 text-lg">🚫</span>
-            <div>
-              <p className="text-red-700 font-semibold text-sm">출제기준 변경 문제</p>
-              <p className="text-red-500 text-xs">현재 출제기준과 다릅니다. 학습 참고용으로만 활용하세요.</p>
-            </div>
-          </div>
-        )}
-
-        <div className="bg-white rounded-xl shadow p-6 mb-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex flex-wrap gap-2">
-              <p className="text-xs text-gray-400">{q.subject} · {q.year}년 {q.round}회</p>
-              {q.importance === "필수" && <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>}
-              {q.importance === "중요" && <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>}
-            </div>
-            {/* 북마크 버튼 */}
-            <button onClick={() => toggleBookmark(q.id)} className="text-xl ml-2 flex-shrink-0">
-              {bookmarks.has(q.id) ? "🔖" : "📄"}
-            </button>
-          </div>
-          <p className="text-base font-medium text-gray-800 leading-relaxed mb-3">{q.question_number}. {q.question_text}</p>
-          {q.duplicate_cnt >= 2 && (
-            <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
-              <span className="text-blue-500 text-sm">🔁</span>
+      <div className="max-w-6xl mx-auto px-4 py-6 lg:flex lg:gap-6 lg:items-start">
+        <div className="flex-1 min-w-0 max-w-2xl lg:max-w-none mx-auto lg:mx-0">
+          {q.is_deprecated && (
+            <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-3 flex items-start gap-2">
+              <span className="text-red-500 text-lg">🚫</span>
               <div>
-                <p className="text-blue-700 text-xs font-semibold">{q.duplicate_cnt}회 출제된 문제</p>
-                <p className="text-blue-500 text-xs">{q.duplicate_appearances}</p>
+                <p className="text-red-700 font-semibold text-sm">출제기준 변경 문제</p>
+                <p className="text-red-500 text-xs">현재 출제기준과 다릅니다. 학습 참고용으로만 활용하세요.</p>
               </div>
             </div>
           )}
-          {q.image_url && (
-            <div className="mt-3 mb-2 flex justify-center">
-              <img src={q.image_url} alt="문제 이미지" className="max-w-full rounded-lg border border-gray-200" style={{ maxHeight: "250px" }} />
-            </div>
-          )}
-        </div>
 
-        <div className="flex flex-col gap-3 mb-4">
-          {[1, 2, 3, 4].map(num => (
-            <button key={num} onClick={() => selectAnswer(num)}
-              className={`w-full text-left px-5 py-4 rounded-xl border-2 text-sm font-medium transition-all
-                ${answers[current] === num ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-700 hover:border-blue-300"}`}>
-              {num}. {q[`option_${num}`]}
-            </button>
-          ))}
-        </div>
-
-        {answers[current] && (
-          <button onClick={() => setShowExplanation(!showExplanation)} className="w-full py-2 text-sm text-blue-600 hover:underline mb-3">
-            {showExplanation ? "해설 닫기 ▲" : "해설 보기 ▼"}
-          </button>
-        )}
-        {showExplanation && q.explanation && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4 text-sm text-gray-700">
-            <p className="font-semibold text-yellow-700 mb-1">📖 해설</p>
-            <p>{q.explanation}</p>
-          </div>
-        )}
-
-        <button onClick={handleToggleNotes} className="w-full py-2 text-sm text-purple-600 hover:underline mb-3 border border-purple-200 rounded-xl bg-purple-50">
-          {showNotes ? "✏️ 풀이 닫기 ▲" : "✏️ 풀이 보기 / 작성 ▼"}
-        </button>
-
-        {showNotes && (
-          <div className="bg-white rounded-xl shadow p-5 mb-4">
-            {user ? (
-              <div className="mb-5">
-                <p className="text-sm font-semibold text-gray-700 mb-2">✏️ 내 풀이 작성</p>
-                <textarea value={myNote} onChange={e => setMyNote(e.target.value)}
-                  placeholder="이 문제의 풀이를 작성해보세요. 다른 수험생에게 도움이 됩니다!"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-purple-400" rows={4} />
-                <button onClick={saveNote} disabled={noteSaving || !myNote.trim()}
-                  className="mt-2 w-full py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-40">
-                  {noteSaving ? "저장 중..." : "풀이 저장"}
-                </button>
+          <div className="bg-white rounded-xl shadow p-6 mb-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex flex-wrap gap-2">
+                <p className="text-xs text-gray-400">{q.subject} · {aiset ? `AI 추천 문제 ${aiset}` : `${q.year}년 ${q.round}회`}</p>
+                {q.importance === "필수" && <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>}
+                {q.importance === "중요" && <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>}
               </div>
-            ) : (
-              <div className="mb-5 bg-gray-50 rounded-xl p-4 text-center text-sm text-gray-500">
-                풀이를 작성하려면 <a href="/login" className="text-purple-600 font-semibold hover:underline">로그인</a>이 필요합니다
+              <button onClick={() => toggleBookmark(q.id)} className="text-xl ml-2 flex-shrink-0">
+                {bookmarks.has(q.id) ? "🔖" : "📄"}
+              </button>
+            </div>
+            <p className="text-base font-medium text-gray-800 leading-relaxed mb-3 whitespace-pre-wrap">{q.question_number}. {q.question_text}</p>
+
+            {q.duplicate_cnt >= 2 && (
+              <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
+                <span className="text-blue-500 text-sm">🔁</span>
+                <div>
+                  <p className="text-blue-700 text-xs font-semibold">{q.duplicate_cnt}회 동일 출제</p>
+                  <p className="text-blue-500 text-xs">{q.duplicate_appearances}</p>
+                </div>
               </div>
             )}
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">👥 다른 수험생 풀이 {notes.length > 0 && <span className="text-gray-400 font-normal">({notes.length}개)</span>}</p>
-              {notesLoading ? (
-                <p className="text-xs text-gray-400 text-center py-4">불러오는 중...</p>
-              ) : notes.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">아직 작성된 풀이가 없어요. 첫 번째 풀이를 작성해보세요!</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {notes.map((note, idx) => (
-                    <div key={note.id} className={`rounded-xl border p-4 ${idx === 0 ? "border-yellow-300 bg-yellow-50" : "border-gray-200 bg-gray-50"}`}>
-                      {idx === 0 && <span className="text-xs text-yellow-600 font-bold mb-1 block">🏆 베스트 풀이</span>}
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-gray-400">{note.user_id === user?.id ? "✏️ 내 풀이" : `수험생 ${note.user_id.slice(0, 6)}`}</span>
-                        <button onClick={() => toggleLike(note.id)} disabled={!user}
-                          className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition-all
-                            ${likedNotes.has(note.id) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300 hover:border-blue-400"}`}>
-                          👍 {note.like_count}
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
-                    </div>
-                  ))}
+
+            {q.image_url && (
+              <div className="mt-3 mb-2 flex justify-center">
+                <img src={q.image_url} alt="문제 이미지" className="max-w-full rounded-lg border border-gray-200" style={{ maxHeight: "250px" }} />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 mb-4">
+            {[1, 2, 3, 4].map(num => (
+              <button key={num} onClick={() => selectAnswer(num)}
+                className={`w-full text-left px-5 py-4 rounded-xl border-2 text-sm font-medium transition-all
+                  ${answers[current] === num ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-700 hover:border-blue-300"}`}>
+                {num}. {q[`option_${num}`]}
+              </button>
+            ))}
+          </div>
+
+          {answers[current] && (
+            <button onClick={() => setShowExplanation(!showExplanation)} className="w-full py-2 text-sm text-blue-600 hover:underline mb-3">
+              {showExplanation ? "해설 닫기 ▲" : "해설 보기 ▼"}
+            </button>
+          )}
+          {showExplanation && q.explanation && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4 text-sm text-gray-700">
+              <p className="font-semibold text-yellow-700 mb-1">📖 해설</p>
+              <p>{q.explanation}</p>
+            </div>
+          )}
+
+          {answers[current] && (
+            <div className="mb-3">
+              <button onClick={() => getSingleAi(current, questions[current])} disabled={singleAiLoading === current}
+                className="w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
+                {singleAiLoading === current ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
+              </button>
+              {singleAi[current] && (
+                <div className="mt-2 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {singleAi[current]}
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="flex gap-3">
-          <button onClick={() => moveTo(current - 1)} disabled={current === 0}
-            className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-xl font-semibold disabled:opacity-30 hover:bg-gray-50">← 이전</button>
-          <button onClick={() => moveTo(current + 1)} disabled={current === questions.length - 1}
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold disabled:opacity-30 hover:bg-blue-700">다음 →</button>
+          <button onClick={handleToggleNotes} className="w-full py-2 text-sm text-purple-600 hover:underline mb-3 border border-purple-200 rounded-xl bg-purple-50">
+            {showNotes ? "✏️ 풀이 닫기 ▲" : "✏️ 풀이 보기 / 작성 ▼"}
+          </button>
+
+          {showNotes && (
+            <div className="bg-white rounded-xl shadow p-5 mb-4">
+              {user ? (
+                <div className="mb-5">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">✏️ 내 풀이 작성</p>
+                  <textarea value={myNote} onChange={e => setMyNote(e.target.value)}
+                    placeholder="이 문제의 풀이를 작성해보세요. 다른 수험생에게 도움이 됩니다!"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-purple-400" rows={4} />
+                  <button onClick={saveNote} disabled={noteSaving || !myNote.trim()}
+                    className="mt-2 w-full py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-40">
+                    {noteSaving ? "저장 중..." : "풀이 저장"}
+                  </button>
+                </div>
+              ) : (
+                <div className="mb-5 bg-gray-50 rounded-xl p-4 text-center text-sm text-gray-500">
+                  풀이를 작성하려면 <a href="/login" className="text-purple-600 font-semibold hover:underline">로그인</a>이 필요합니다
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3">👥 다른 수험생 풀이 {notes.length > 0 && <span className="text-gray-400 font-normal">({notes.length}개)</span>}</p>
+                {notesLoading ? (
+                  <p className="text-xs text-gray-400 text-center py-4">불러오는 중...</p>
+                ) : notes.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-4">아직 작성된 풀이가 없어요. 첫 번째 풀이를 작성해보세요!</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {notes.map((note, idx) => (
+                      <div key={note.id} className={`rounded-xl border p-4 ${idx === 0 ? "border-yellow-300 bg-yellow-50" : "border-gray-200 bg-gray-50"}`}>
+                        {idx === 0 && <span className="text-xs text-yellow-600 font-bold mb-1 block">🏆 베스트 풀이</span>}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-400">{note.user_id === user?.id ? "✏️ 내 풀이" : `수험생 ${note.user_id.slice(0, 6)}`}</span>
+                          <button onClick={() => toggleLike(note.id)} disabled={!user}
+                            className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition-all
+                              ${likedNotes.has(note.id) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300 hover:border-blue-400"}`}>
+                            👍 {note.like_count}
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button onClick={() => moveTo(current - 1)} disabled={current === 0}
+              className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded-xl font-semibold disabled:opacity-30 hover:bg-gray-50">← 이전</button>
+            <button onClick={() => moveTo(current + 1)} disabled={current === questions.length - 1}
+              className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold disabled:opacity-30 hover:bg-blue-700">다음 →</button>
+          </div>
         </div>
+
+        {/* 데스크톱 사이드바 */}
+        <aside className="hidden lg:block w-72 flex-shrink-0">
+          <div className="sticky top-24">
+            <NavigationPanel />
+          </div>
+        </aside>
       </div>
+
+      {/* 모바일 플로팅 버튼 */}
+      <button
+        onClick={() => setShowNav(true)}
+        className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-20 hover:bg-blue-700 active:scale-95 transition"
+        aria-label="문제 번호 네비게이션 열기"
+      >
+        📋
+      </button>
+
+      {/* 모바일 바텀시트 */}
+      {showNav && (
+        <div className="lg:hidden fixed inset-0 z-30 bg-black/50 flex items-end" onClick={() => setShowNav(false)}>
+          <div className="w-full bg-gray-50 rounded-t-2xl max-h-[85vh] overflow-y-auto p-4" onClick={e => e.stopPropagation()}>
+            <NavigationPanel />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,12 +3,18 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import Link from "next/link"
 
+const ADMIN_EMAIL = "jaetech01@gmail.com"
+
 export default function CBTPage() {
   const [examTypes, setExamTypes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAdmin(user?.email === ADMIN_EMAIL)
+    })
     supabase.from("exam_types").select("*").eq("is_active", true).then(({ data }) => {
       setExamTypes(data || [])
       setLoading(false)
@@ -20,7 +26,6 @@ export default function CBTPage() {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">📝 필기 CBT</h1>
         <p className="text-gray-500 text-sm mb-8">시험 종목을 선택하세요</p>
-
         {loading ? (
           <p className="text-gray-400 text-center py-20">불러오는 중...</p>
         ) : (
@@ -45,6 +50,14 @@ export default function CBTPage() {
                   >
                     과년도 풀기
                   </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/cbt/popular"
+                      className="flex-1 py-2 bg-white border border-green-600 text-green-600 rounded-lg text-sm font-semibold text-center hover:bg-green-50"
+                    >
+                      📊 최다출제
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
