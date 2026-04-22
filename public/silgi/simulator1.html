@@ -2137,6 +2137,7 @@ function drawWires() {
   wireG.querySelectorAll('.wire-handle').forEach(el => {
     el.addEventListener('mousedown', startHandleDrag);
   });
+  if (typeof __sendSave === 'function') __sendSave();
 }
 
 
@@ -3009,6 +3010,52 @@ function resetZoom() {
     </div>
   </div>
 </div>
+
+<script>
+// ==================== Next.js 연동 (postMessage) ====================
+let __isEmbedded = window.parent !== window;
+let __saveTimer = null;
+
+function __sendSave() {
+  if (!__isEmbedded) return;
+  clearTimeout(__saveTimer);
+  __saveTimer = setTimeout(() => {
+    try {
+      const progress = (typeof computeProgress === "function") ? computeProgress() : 0;
+      window.parent.postMessage({
+        type: "SAVE_PROGRESS",
+        payload: {
+          phase: currentPhase,
+          wire_data: wires || [],
+          progress_pct: progress
+        }
+      }, "*");
+    } catch(e) { console.error("SAVE_PROGRESS error:", e); }
+  }, 500);
+}
+
+window.addEventListener("message", (ev) => {
+  if (!ev.data || typeof ev.data !== "object") return;
+  if (ev.data.type === "LOAD_PROGRESS") {
+    try {
+      const records = ev.data.payload || [];
+      records.forEach(r => {
+        const key = `phase_custom_answer_${r.phase}`;
+        if (r.wire_data) {
+          localStorage.setItem(key, JSON.stringify({ wires: r.wire_data }));
+        }
+      });
+      if (typeof loadSavedAnswer === "function") loadSavedAnswer();
+    } catch(e) { console.error("LOAD_PROGRESS error:", e); }
+  }
+});
+
+window.addEventListener("load", () => {
+  if (__isEmbedded) {
+    window.parent.postMessage({ type: "IFRAME_READY" }, "*");
+  }
+});
+</script>
 
 </body>
 </html>
