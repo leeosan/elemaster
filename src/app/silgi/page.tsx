@@ -44,7 +44,7 @@ export default function SilgiPage() {
       if (!ev.data || typeof ev.data !== "object") return
       if (ev.data.type === "SAVE_PROGRESS") {
         const { phase, wire_data, progress_pct } = ev.data.payload
-        await supabase.from("simulator_progress").upsert({
+        const { error: upsertError } = await supabase.from("simulator_progress").upsert({
           user_id: userId,
           simulator_id: "phase1_main",
           phase: String(phase),
@@ -52,6 +52,7 @@ export default function SilgiPage() {
           progress_pct,
           updated_at: new Date().toISOString()
         }, { onConflict: "user_id,simulator_id,phase" })
+        if (upsertError) console.error("[SAVE_PROGRESS] error:", upsertError)
       }
       if (ev.data.type === "IFRAME_READY") {
         loadAndSend()
