@@ -3021,7 +3021,8 @@ function __sendSave() {
   clearTimeout(__saveTimer);
   __saveTimer = setTimeout(() => {
     try {
-      const progress = (typeof computeProgress === "function") ? computeProgress() : 0;
+      const progObj = (typeof computeProgress === "function") ? computeProgress() : null;
+      const progress = (progObj && progObj.total > 0) ? Math.round((progObj.completed / progObj.total) * 100) : 0;
       window.parent.postMessage({
         type: "SAVE_PROGRESS",
         payload: {
