@@ -75,7 +75,7 @@ export default function SilgiPage() {
         </div>
       </div>
       <iframe id="sim-iframe" 
-        src="/silgi/simulator1.html"
+        src="/api/silgi/simulator/phase1-main"
         className="w-full border-0"
         style={{ height: "calc(100vh - 60px)" }}
         title="전기기능장 주회로 시뮬레이터"
