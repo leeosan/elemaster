@@ -79,6 +79,8 @@ export default function SilgiPage() {
         className="w-full border-0"
         style={{ height: "calc(100vh - 60px)" }}
         title="전기기능장 주회로 시뮬레이터"
+        tabIndex={0}
+        allow="clipboard-read; clipboard-write"
       />
     </div>
   )
