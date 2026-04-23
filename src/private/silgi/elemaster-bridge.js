@@ -80,4 +80,31 @@
   }
 
   wrapDrawWires();
+
+  // ==================== 키보드 포커스 관리 ====================
+  // iframe 내부 body가 키보드 이벤트를 받을 수 있도록 자동 포커스
+  
+  function focusBody() {
+    try {
+      if (document.body) {
+        document.body.focus();
+      }
+    } catch(e) {}
+  }
+
+  // 1. 로드 완료 시 자동 포커스
+  if (document.readyState === "complete") {
+    setTimeout(focusBody, 100);
+  } else {
+    window.addEventListener("load", () => setTimeout(focusBody, 100));
+  }
+
+  // 2. 클릭 시 자동 포커스 (사용자가 시뮬레이터를 클릭하면)
+  document.addEventListener("click", focusBody);
+  document.addEventListener("mousedown", focusBody);
+
+  // 3. 부모 창이 iframe을 focus 요청 시에도 body로 이동
+  window.addEventListener("focus", focusBody);
+
+  console.log("[Bridge] keyboard focus management enabled");
 })();
