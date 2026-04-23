@@ -3996,27 +3996,37 @@ function renderPinOverlays() {
           duplicatePinOverlay(idx);
           return;
         }
-        // Shift+클릭: 다중 선택 (토글)
+        // Shift+클릭: 다중 선택 (토글) - DOM 재생성 없이 클래스만 업데이트
         if (e.shiftKey) {
           e.preventDefault();
           e.stopPropagation();
           if (pinSelectedSet.has(idx)) {
             pinSelectedSet.delete(idx);
+            e.currentTarget.classList.remove('selected');
             if (pinSelectedIdx === idx) {
               pinSelectedIdx = pinSelectedSet.size > 0 ? [...pinSelectedSet][0] : -1;
             }
           } else {
             pinSelectedSet.add(idx);
+            e.currentTarget.classList.add('selected');
             pinSelectedIdx = idx;
           }
-          renderPinOverlays();
           updatePinOverlayButtons();
           return;
         }
         // 일반 클릭: 단일 선택으로 재설정 후 드래그
+        // DOM 재생성 없이 클래스만 토글 (dblclick 이벤트 유지를 위해)
         if (!pinSelectedSet.has(idx)) {
+          // 기존 선택 모두 해제 (DOM 재생성 없이)
+          const lyr = document.getElementById('pin-overlay-layer');
+          pinSelectedSet.forEach(i => {
+            const oldEl = lyr && lyr.querySelector(`.pin-num[data-idx="${i}"]`);
+            if (oldEl) oldEl.classList.remove('selected');
+          });
           pinSelectedSet.clear();
           pinSelectedSet.add(idx);
+          e.currentTarget.classList.add('selected');
+          updatePinOverlayButtons();
         }
         pinSelectedIdx = idx;
         startPinDrag(e);
@@ -4495,16 +4505,38 @@ function startPinDrag(e) {
   const layer = document.getElementById('pin-overlay-layer');
   const rect = layer.getBoundingClientRect();
   
+  // 선택된 모든 핀의 초기 좌표 저장 (다중 드래그 지원)
+  // pinSelectedSet에 idx가 없으면 단일 드래그로 처리 (mousedown 핸들러에서 이미 보정됨)
+  let dragIndices = [];
+  if (pinSelectedSet.size > 0 && pinSelectedSet.has(idx)) {
+    dragIndices = Array.from(pinSelectedSet);
+  } else {
+    dragIndices = [idx];
+  }
+  
+  const pins = dragIndices
+    .filter(i => pinOverlays[i])
+    .map(i => ({
+      idx: i,
+      initX: pinOverlays[i].x,
+      initY: pinOverlays[i].y,
+      el: layer.querySelector(`[data-idx="${i}"]`)
+    }));
+  
   pinDragState = {
-    idx,
+    mainIdx: idx,
     layerRect: rect,
     startX: e.clientX,
     startY: e.clientY,
-    initX: pin.x,
-    initY: pin.y,
-    el: e.currentTarget
+    pins: pins,
+    moved: false
   };
-  e.currentTarget.classList.add('dragging');
+  
+  // 드래그 중인 모든 핀에 dragging 클래스 추가
+  pins.forEach(p => {
+    if (p.el) p.el.classList.add('dragging');
+  });
+  
   document.addEventListener('mousemove', onPinDrag);
   document.addEventListener('mouseup', endPinDrag);
 }
@@ -4517,21 +4549,44 @@ function onPinDrag(e) {
   const dxp = (dx / pinDragState.layerRect.width) * 100;
   const dyp = (dy / pinDragState.layerRect.height) * 100;
   
-  const pin = pinOverlays[pinDragState.idx];
-  pin.x = Math.max(0, Math.min(100, pinDragState.initX + dxp));
-  pin.y = Math.max(0, Math.min(100, pinDragState.initY + dyp));
+  // 실제 이동이 있었는지 체크 (픽셀 기준 2px 이상 이동 시 moved로 간주)
+  if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+    pinDragState.moved = true;
+  }
   
-  pinDragState.el.style.left = pin.x + '%';
-  pinDragState.el.style.top = pin.y + '%';
+  // 선택된 모든 핀의 좌표와 DOM 동시 업데이트
+  pinDragState.pins.forEach(p => {
+    const pin = pinOverlays[p.idx];
+    if (!pin) return;
+    pin.x = Math.max(0, Math.min(100, p.initX + dxp));
+    pin.y = Math.max(0, Math.min(100, p.initY + dyp));
+    if (p.el) {
+      p.el.style.left = pin.x + '%';
+      p.el.style.top = pin.y + '%';
+    }
+  });
 }
 
 function endPinDrag() {
   if (!pinDragState) return;
-  pinDragState.el.classList.remove('dragging');
+  // dragging 클래스 제거
+  pinDragState.pins.forEach(p => {
+    if (p.el) p.el.classList.remove('dragging');
+  });
+  const count = pinDragState.pins.length;
+  const moved = pinDragState.moved;
   pinDragState = null;
   document.removeEventListener('mousemove', onPinDrag);
   document.removeEventListener('mouseup', endPinDrag);
-  savePinOverlays();
+  if (moved) {
+    savePinOverlays();
+    if (count > 1 && typeof setStatus === 'function') {
+      setStatus(`✓ ${count}개 핀번호 함께 이동됨`, 'ok');
+    }
+  }
+  // renderPinOverlays() 호출하지 않음 - dblclick 이벤트 방해 방지
+  // DOM은 드래그 중에 이미 업데이트됨
+  updatePinOverlayButtons();
 }
 
 function resetPinOverlays() {
@@ -4546,141 +4601,146 @@ function resetPinOverlays() {
 // 좌표: 이미지 대비 백분율 (1216x557 기준)
 const PIN_OVERLAYS_PRESET_AUX = [
   // ===== 좌측 3상 주회로 =====
-  // EOCR 상부 (L1, L2, L3)
-  { x: 9.0,  y: 25, text: '1', color: 'blue' },
-  { x: 11.5, y: 25, text: '2', color: 'blue' },
-  { x: 14.0, y: 25, text: '3', color: 'blue' },
-  // EOCR 하부
-  { x: 9.0,  y: 39, text: '4', color: 'red' },
-  { x: 11.5, y: 39, text: '5', color: 'red' },
-  { x: 14.0, y: 39, text: '6', color: 'red' },
+  // EOCR 상부 (L1, L2, L3) - 파랑 전원
+  { x: 8.0,  y: 25, text: '1', color: 'blue' },
+  { x: 10.5, y: 25, text: '2', color: 'blue' },
+  { x: 13.0, y: 25, text: '3', color: 'blue' },
+  // EOCR 하부 - 빨강
+  { x: 8.0,  y: 39, text: '4', color: 'red' },
+  { x: 10.5, y: 39, text: '5', color: 'red' },
+  { x: 13.0, y: 39, text: '6', color: 'red' },
   // MC1 상부/하부
-  { x: 9.0,  y: 42, text: '1', color: 'blue' },
-  { x: 11.5, y: 42, text: '2', color: 'blue' },
-  { x: 14.0, y: 42, text: '3', color: 'blue' },
-  { x: 9.0,  y: 50, text: '4', color: 'red' },
-  { x: 11.5, y: 50, text: '5', color: 'red' },
-  { x: 14.0, y: 50, text: '6', color: 'red' },
+  { x: 8.0,  y: 44, text: '1', color: 'blue' },
+  { x: 10.5, y: 44, text: '2', color: 'blue' },
+  { x: 13.0, y: 44, text: '3', color: 'blue' },
+  { x: 8.0,  y: 54, text: '4', color: 'red' },
+  { x: 10.5, y: 54, text: '5', color: 'red' },
+  { x: 13.0, y: 54, text: '6', color: 'red' },
   // MC3 상부/하부
-  { x: 5.5,  y: 53, text: '1', color: 'blue' },
-  { x: 8.0,  y: 53, text: '2', color: 'blue' },
-  { x: 10.5, y: 53, text: '3', color: 'blue' },
-  { x: 5.5,  y: 61, text: '4', color: 'red' },
-  { x: 8.0,  y: 61, text: '5', color: 'red' },
-  { x: 10.5, y: 61, text: '6', color: 'red' },
+  { x: 3.5,  y: 59, text: '1', color: 'blue' },
+  { x: 6.0,  y: 59, text: '2', color: 'blue' },
+  { x: 8.5,  y: 59, text: '3', color: 'blue' },
+  { x: 3.5,  y: 67, text: '4', color: 'red' },
+  { x: 6.0,  y: 67, text: '5', color: 'red' },
+  { x: 8.5,  y: 67, text: '6', color: 'red' },
   // MC2 상부/하부
-  { x: 14.0, y: 53, text: '1', color: 'blue' },
-  { x: 16.5, y: 53, text: '2', color: 'blue' },
-  { x: 19.0, y: 53, text: '3', color: 'blue' },
-  { x: 14.0, y: 61, text: '4', color: 'red' },
-  { x: 16.5, y: 61, text: '5', color: 'red' },
-  { x: 19.0, y: 61, text: '6', color: 'red' },
+  { x: 12.5, y: 59, text: '1', color: 'blue' },
+  { x: 15.0, y: 59, text: '2', color: 'blue' },
+  { x: 17.5, y: 59, text: '3', color: 'blue' },
+  { x: 12.5, y: 67, text: '4', color: 'red' },
+  { x: 15.0, y: 67, text: '5', color: 'red' },
+  { x: 17.5, y: 67, text: '6', color: 'red' },
   // MC4 상부/하부
-  { x: 22.5, y: 53, text: '1', color: 'blue' },
-  { x: 25.0, y: 53, text: '2', color: 'blue' },
-  { x: 27.5, y: 53, text: '3', color: 'blue' },
+  { x: 20.5, y: 59, text: '1', color: 'blue' },
+  { x: 23.0, y: 59, text: '2', color: 'blue' },
+  { x: 25.5, y: 59, text: '3', color: 'blue' },
+  { x: 20.5, y: 67, text: '4', color: 'red' },
+  { x: 23.0, y: 67, text: '5', color: 'red' },
+  { x: 25.5, y: 67, text: '6', color: 'red' },
   
-  // ===== 우측 제어회로 (접점 라인) =====
-  // EOCR (좌측 세로 라인)
-  { x: 36.5, y: 16, text: '10', color: 'red' },
-  { x: 39.5, y: 16, text: '4',  color: 'red' },
-  { x: 36.5, y: 24, text: '5',  color: 'red' },
-  // SS1
-  { x: 42.5, y: 16, text: '3',  color: 'red' },
-  { x: 45.0, y: 16, text: '1',  color: 'red' },
-  { x: 42.5, y: 27, text: '1',  color: 'red' },
-  { x: 45.0, y: 27, text: '3',  color: 'red' },
-  { x: 42.5, y: 34, text: '2',  color: 'red' },
-  { x: 45.0, y: 34, text: '4',  color: 'red' },
+  // ===== 우측 제어회로 (접점 라인 - 빨강) =====
+  // EOCR 접점 (좌측 세로선)
+  { x: 30.0, y: 18, text: '10', color: 'red' },
+  { x: 33.5, y: 18, text: '4',  color: 'red' },
+  { x: 30.0, y: 25, text: '5',  color: 'red' },
+  // SS1 / SS2
+  { x: 37.5, y: 18, text: '3',  color: 'red' },
+  { x: 40.0, y: 18, text: '1',  color: 'red' },
+  { x: 37.5, y: 24, text: '1',  color: 'red' },
+  { x: 40.0, y: 24, text: '3',  color: 'red' },
+  { x: 37.5, y: 31, text: '2',  color: 'red' },
+  { x: 40.0, y: 31, text: '4',  color: 'red' },
   // SS3
-  { x: 49.0, y: 16, text: '3',  color: 'red' },
+  { x: 43.5, y: 18, text: '3',  color: 'red' },
   
-  // PB1
-  { x: 55.5, y: 16, text: '3',  color: 'red' },
-  { x: 55.5, y: 26, text: '11', color: 'red' },
-  // K4 (상)
-  { x: 58.5, y: 16, text: '10', color: 'red' },
-  { x: 58.5, y: 26, text: '6',  color: 'red' },
-  // K4 (중)
-  { x: 65.5, y: 16, text: '11', color: 'red' },
-  { x: 65.5, y: 26, text: '7',  color: 'red' },
-  // K1, K2
-  { x: 54.0, y: 33, text: '7',  color: 'red' },
-  { x: 57.5, y: 33, text: '11', color: 'red' },
+  // PB1 (상단)
+  { x: 47.0, y: 18, text: '3',  color: 'red' },
+  { x: 47.0, y: 26, text: '11', color: 'red' },
+  // K4 (좌)
+  { x: 50.5, y: 18, text: '10', color: 'red' },
+  { x: 50.5, y: 26, text: '6',  color: 'red' },
+  // K4 (우)
+  { x: 55.5, y: 18, text: '11', color: 'red' },
+  { x: 55.5, y: 26, text: '7',  color: 'red' },
+  // K1, K2 (중단 가로선 위)
+  { x: 48.0, y: 34, text: '7',  color: 'red' },
+  { x: 52.0, y: 34, text: '11', color: 'red' },
   // PB0
-  { x: 55.5, y: 42, text: '8',  color: 'red' },
-  { x: 55.5, y: 51, text: '12', color: 'red' },
+  { x: 47.0, y: 42, text: '8',  color: 'red' },
+  { x: 47.0, y: 51, text: '12', color: 'red' },
+  // K1 (중)
+  { x: 50.5, y: 42, text: '8',  color: 'red' },
   // T2, T1
-  { x: 72.0, y: 42, text: '8',  color: 'red' },
-  { x: 75.5, y: 42, text: '12', color: 'red' },
+  { x: 60.0, y: 42, text: '8',  color: 'red' },
+  { x: 64.5, y: 42, text: '12', color: 'red' },
   // K2 (우측)
-  { x: 78.5, y: 42, text: '2',  color: 'red' },
-  { x: 78.5, y: 51, text: '9',  color: 'red' },
+  { x: 68.0, y: 42, text: '2',  color: 'red' },
+  { x: 68.0, y: 51, text: '9',  color: 'red' },
   // K3 (중앙 상)
-  { x: 54.5, y: 55, text: '10', color: 'red' },
-  { x: 58.5, y: 55, text: '12', color: 'red' },
-  { x: 54.5, y: 62, text: '2',  color: 'red' },
-  { x: 58.5, y: 62, text: '4',  color: 'red' },
+  { x: 47.0, y: 55, text: '10', color: 'red' },
+  { x: 50.5, y: 55, text: '12', color: 'red' },
+  { x: 47.0, y: 62, text: '2',  color: 'red' },
+  { x: 50.5, y: 62, text: '4',  color: 'red' },
   // K3, K1 (하)
-  { x: 54.5, y: 65, text: '10', color: 'red' },
-  { x: 58.5, y: 65, text: '12', color: 'red' },
-  { x: 54.5, y: 71, text: '2',  color: 'red' },
-  { x: 58.5, y: 71, text: '4',  color: 'red' },
-  // MC4
-  { x: 67.5, y: 62, text: '11', color: 'red' },
-  { x: 67.5, y: 71, text: '5',  color: 'red' },
+  { x: 47.0, y: 66, text: '10', color: 'red' },
+  { x: 50.5, y: 66, text: '12', color: 'red' },
+  { x: 47.0, y: 72, text: '2',  color: 'red' },
+  { x: 50.5, y: 72, text: '4',  color: 'red' },
+  // MC4 (중)
+  { x: 55.5, y: 63, text: '11', color: 'red' },
+  { x: 55.5, y: 72, text: '5',  color: 'red' },
   // SEN
-  { x: 83.0, y: 35, text: '11', color: 'red' },
+  { x: 73.0, y: 37, text: '11', color: 'red' },
   // K3 (우측 상)
-  { x: 83.0, y: 16, text: '9',  color: 'red' },
-  { x: 83.0, y: 26, text: '5',  color: 'red' },
-  // MC1~4 접점 (우측 상단 4개)
-  { x: 89.5, y: 16, text: '10', color: 'red' },
-  { x: 89.5, y: 26, text: '4',  color: 'red' },
-  { x: 92.5, y: 16, text: '10', color: 'red' },
+  { x: 73.0, y: 18, text: '9',  color: 'red' },
+  { x: 73.0, y: 26, text: '5',  color: 'red' },
+  // MC1~4 상단 접점 (우측 4개)
+  { x: 84.0, y: 18, text: '10', color: 'red' },
+  { x: 84.0, y: 26, text: '4',  color: 'red' },
+  { x: 88.5, y: 18, text: '10', color: 'red' },
+  { x: 88.5, y: 26, text: '4',  color: 'red' },
+  { x: 92.5, y: 18, text: '10', color: 'red' },
   { x: 92.5, y: 26, text: '4',  color: 'red' },
-  { x: 95.5, y: 16, text: '10', color: 'red' },
-  { x: 95.5, y: 26, text: '4',  color: 'red' },
-  { x: 98.5, y: 16, text: '10', color: 'red' },
-  { x: 98.5, y: 26, text: '4',  color: 'red' },
+  { x: 97.0, y: 18, text: '10', color: 'red' },
+  { x: 97.0, y: 26, text: '4',  color: 'red' },
   // MC1 (우측 중단)
-  { x: 86.0, y: 67, text: '11', color: 'red' },
-  { x: 86.0, y: 75, text: '5',  color: 'red' },
+  { x: 78.0, y: 67, text: '11', color: 'red' },
+  { x: 78.0, y: 76, text: '5',  color: 'red' },
   
   // ===== 하단 원형 기구 전원 (파란색) =====
   // EOCR
-  { x: 36.5, y: 80, text: '6',  color: 'blue' },
-  { x: 36.5, y: 89, text: '12', color: 'blue' },
+  { x: 30.0, y: 74, text: '6',  color: 'blue' },
+  { x: 30.0, y: 88, text: '12', color: 'blue' },
   // K1
-  { x: 50.0, y: 80, text: '13', color: 'blue' },
-  { x: 50.0, y: 89, text: '14', color: 'blue' },
+  { x: 45.0, y: 82, text: '13', color: 'blue' },
+  { x: 45.0, y: 89, text: '14', color: 'red' },
   // K2
-  { x: 54.5, y: 80, text: '13', color: 'blue' },
-  { x: 54.5, y: 89, text: '14', color: 'blue' },
+  { x: 49.0, y: 82, text: '13', color: 'blue' },
+  { x: 49.0, y: 89, text: '14', color: 'red' },
   // K3
-  { x: 58.5, y: 80, text: '13', color: 'blue' },
-  { x: 58.5, y: 89, text: '14', color: 'blue' },
+  { x: 53.0, y: 82, text: '13', color: 'blue' },
+  { x: 53.0, y: 89, text: '14', color: 'red' },
   // T1
-  { x: 63.5, y: 80, text: '2',  color: 'blue' },
-  { x: 63.5, y: 89, text: '7',  color: 'blue' },
+  { x: 58.0, y: 82, text: '2',  color: 'blue' },
+  { x: 58.0, y: 89, text: '7',  color: 'red' },
   // MC1
-  { x: 68.0, y: 80, text: '6',  color: 'blue' },
-  { x: 68.0, y: 89, text: '12', color: 'blue' },
+  { x: 62.0, y: 74, text: '6',  color: 'blue' },
+  { x: 62.0, y: 88, text: '12', color: 'red' },
   // K4
-  { x: 72.0, y: 80, text: '13', color: 'blue' },
-  { x: 72.0, y: 89, text: '14', color: 'blue' },
+  { x: 66.5, y: 82, text: '13', color: 'blue' },
+  { x: 66.5, y: 89, text: '14', color: 'red' },
   // MC2
-  { x: 78.0, y: 80, text: '6',  color: 'blue' },
-  { x: 78.0, y: 89, text: '12', color: 'blue' },
+  { x: 71.0, y: 74, text: '6',  color: 'blue' },
+  { x: 71.0, y: 88, text: '12', color: 'red' },
   // MC3
-  { x: 83.0, y: 80, text: '6',  color: 'blue' },
-  { x: 83.0, y: 89, text: '12', color: 'blue' },
+  { x: 75.5, y: 74, text: '6',  color: 'blue' },
+  { x: 75.5, y: 88, text: '12', color: 'red' },
   // T2
-  { x: 87.0, y: 80, text: '2',  color: 'blue' },
-  { x: 87.0, y: 89, text: '7',  color: 'blue' },
+  { x: 79.0, y: 82, text: '2',  color: 'blue' },
+  { x: 79.0, y: 89, text: '7',  color: 'red' },
   // MC4
-  { x: 91.5, y: 80, text: '6',  color: 'blue' },
-  { x: 91.5, y: 89, text: '12', color: 'blue' },
+  { x: 83.0, y: 74, text: '6',  color: 'blue' },
+  { x: 83.0, y: 88, text: '12', color: 'red' },
 ];
 
 function loadAuxCircuitPreset() {
