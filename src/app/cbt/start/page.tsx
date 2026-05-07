@@ -233,7 +233,7 @@ function CBTStartInner() {
   }
 
   // 문제 번호 네비게이션 사이드바 (데스크톱/모바일 공용)
-  const NavigationPanel = () => {
+  const renderNavigationPanel = () => {
     const answeredCount = Object.keys(answers).length
     const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0
     const groups: number[][] = []
@@ -566,7 +566,7 @@ function CBTStartInner() {
         {/* 데스크톱 사이드바 */}
         <aside className="hidden lg:block w-72 flex-shrink-0">
           <div className="sticky top-24">
-            <NavigationPanel />
+            {renderNavigationPanel()}
           </div>
         </aside>
       </div>
@@ -584,7 +584,7 @@ function CBTStartInner() {
       {showNav && (
         <div className="lg:hidden fixed inset-0 z-30 bg-black/50 flex items-end" onClick={() => setShowNav(false)}>
           <div className="w-full bg-gray-50 rounded-t-2xl max-h-[85vh] overflow-y-auto p-4" onClick={e => e.stopPropagation()}>
-            <NavigationPanel />
+            {renderNavigationPanel()}
           </div>
         </div>
       )}
