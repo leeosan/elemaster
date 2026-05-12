@@ -1,4 +1,4 @@
-﻿export default function ExamInfoPage() {
+export default function ExamInfoPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-2xl mx-auto">
@@ -18,34 +18,40 @@
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                <tr>
-                  <td className="px-3 py-3 font-semibold text-gray-700">필기 1회</td>
-                  <td className="px-3 py-3 text-center text-gray-600">1.19 ~ 1.22</td>
-                  <td className="px-3 py-3 text-center text-gray-600">2.22 ~ 3.10</td>
-                  <td className="px-3 py-3 text-center text-gray-600">3.18</td>
+                <tr className="bg-blue-50/40">
+                  <td colSpan={4} className="px-3 py-2 text-xs font-bold text-blue-700">제79회 (상반기)</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-3 font-semibold text-gray-700">실기 1회</td>
-                  <td className="px-3 py-3 text-center text-gray-600">3.23 ~ 3.26</td>
-                  <td className="px-3 py-3 text-center text-gray-600">4.19 ~ 5.9</td>
-                  <td className="px-3 py-3 text-center text-gray-600">5.27</td>
+                  <td className="px-3 py-3 font-semibold text-gray-700">필기</td>
+                  <td className="px-3 py-3 text-center text-gray-600">1.6 ~ 1.9</td>
+                  <td className="px-3 py-3 text-center text-gray-600">1.24 ~ 1.30</td>
+                  <td className="px-3 py-3 text-center text-gray-400">-</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-3 font-semibold text-gray-700">필기 2회</td>
-                  <td className="px-3 py-3 text-center text-gray-600">6.15 ~ 6.18</td>
-                  <td className="px-3 py-3 text-center text-gray-600">7.19 ~ 8.4</td>
-                  <td className="px-3 py-3 text-center text-gray-600">8.12</td>
+                  <td className="px-3 py-3 font-semibold text-gray-700">실기</td>
+                  <td className="px-3 py-3 text-center text-gray-600">2.2 ~ 2.5</td>
+                  <td className="px-3 py-3 text-center text-gray-600">3.14 ~ 4.1</td>
+                  <td className="px-3 py-3 text-center text-gray-600 font-semibold">4.17</td>
+                </tr>
+                <tr className="bg-blue-50/40">
+                  <td colSpan={4} className="px-3 py-2 text-xs font-bold text-blue-700">제80회 (하반기)</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-3 font-semibold text-gray-700">실기 2회</td>
-                  <td className="px-3 py-3 text-center text-gray-600">8.17 ~ 8.20</td>
-                  <td className="px-3 py-3 text-center text-gray-600">9.20 ~ 10.14</td>
-                  <td className="px-3 py-3 text-center text-gray-600">11.4</td>
+                  <td className="px-3 py-3 font-semibold text-gray-700">필기</td>
+                  <td className="px-3 py-3 text-center text-gray-600">6.8 ~ 6.11</td>
+                  <td className="px-3 py-3 text-center text-gray-600">6.27 ~ 7.2</td>
+                  <td className="px-3 py-3 text-center text-gray-400">-</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-3 font-semibold text-gray-700">실기</td>
+                  <td className="px-3 py-3 text-center text-gray-600">7.27 ~ 7.30</td>
+                  <td className="px-3 py-3 text-center text-gray-600">8.29 ~ 9.16</td>
+                  <td className="px-3 py-3 text-center text-gray-600 font-semibold">10.2</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-gray-400 mt-3">※ 원서접수 첫날 10:00 ~ 마지막날 18:00 / Q-Net(www.q-net.or.kr)에서 접수</p>
+          <p className="text-xs text-gray-400 mt-3">※ 원서접수 첫날 10:00 ~ 마지막날 18:00 / 필기시험은 CBT 방식 / Q-Net(www.q-net.or.kr)에서 접수</p>
         </div>
 
         {/* 합격률 */}
