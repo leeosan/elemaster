@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -65,7 +65,7 @@ function CBTStartInner() {
         setQuestions(ordered)
         setLoading(false)
       } else {
-        let query = supabase.from("questions_with_meta").select("*").eq("exam_type_id", examId)
+        let query = supabase.from("questions_with_meta").select("*").eq("exam_type_id", examId).eq("is_deprecated", false)
         if (year && round) query = query.eq("year", year).eq("round", round)
         query.limit(60).then(({ data }) => {
           const sorted = year && round
