@@ -10,7 +10,6 @@ export default function ElectricianSilgiPage() {
         <h1 className="text-3xl font-bold text-gray-800 mb-2">🔧 전기기능사 실기</h1>
         <p className="text-gray-500 mb-8">실기 시험 안내 및 학습 자료</p>
 
-        {/* 유튜브 시뮬레이터 튜토리얼 */}
         <div className="bg-white rounded-2xl shadow p-6 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-gray-800">🎬 시뮬레이터 5분 튜토리얼</h2>
@@ -18,35 +17,19 @@ export default function ElectricianSilgiPage() {
           </div>
 
           <div className="relative w-full mb-3" style={{ paddingBottom: "56.25%" }}>
-            <iframe
-              src="https://www.youtube.com/embed/1Qi6cNonqzk"
-              title="전기 시뮬레이터(CraftsMan) 5분 튜토리얼"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              className="absolute top-0 left-0 w-full h-full rounded-xl"
-            />
+            <iframe src="https://www.youtube.com/embed/1Qi6cNonqzk" title="전기 시뮬레이터(CraftsMan) 5분 튜토리얼" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen className="absolute top-0 left-0 w-full h-full rounded-xl" />
           </div>
 
-          <h3 className="font-semibold text-gray-800 text-sm mb-2">
-            전기 시뮬레이터(CraftsMan) 5분 튜토리얼 안내
-          </h3>
+          <h3 className="font-semibold text-gray-800 text-sm mb-2">전기 시뮬레이터(CraftsMan) 5분 튜토리얼 안내</h3>
           <p className="text-xs text-gray-500 mb-2">조회수 1,444회 · 2026. 4. 21.</p>
 
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            전기기능사 및 승강기기능사를 시뮬레이션 해볼 수 있는 프로그램 <strong>CraftsMan 베타버전</strong>이 출시되었습니다.
-            영상의 5분 튜토리얼 보시고 플레이해보세요!
+            전기기능사 및 승강기기능사를 시뮬레이션 해볼 수 있는 프로그램 <strong>CraftsMan 베타버전</strong>이 출시되었습니다. 영상의 5분 튜토리얼 보시고 플레이해보세요!
           </p>
 
-          
-            href="https://github.com/HuichaeStudio/CraftsMan"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-700 transition mb-3"
-          >
-            💾 CraftsMan 다운로드 (GitHub)
-          </a>
+          <a href="https://github.com/HuichaeStudio/CraftsMan" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-700 transition mb-3">💾 CraftsMan 다운로드 (GitHub)</a>
 
-          <div className="flex flex-wrap gap-1 mb-3">
+          <div className="flex flex-wrap gap-1 mb-3 mt-3">
             <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#전기기능사실기</span>
             <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#전기기능사</span>
             <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#craftsman</span>
@@ -57,7 +40,6 @@ export default function ElectricianSilgiPage() {
           </div>
         </div>
 
-        {/* 시험 개요 */}
         <div className="bg-white rounded-2xl shadow p-6 mb-4">
           <h2 className="text-lg font-bold text-gray-800 mb-3">📋 시험 개요</h2>
           <ul className="text-sm text-gray-600 space-y-2">
@@ -68,7 +50,6 @@ export default function ElectricianSilgiPage() {
           </ul>
         </div>
 
-        {/* 학습 포인트 */}
         <div className="bg-white rounded-2xl shadow p-6 mb-4">
           <h2 className="text-lg font-bold text-gray-800 mb-3">📚 학습 포인트</h2>
           <ul className="text-sm text-gray-600 space-y-2">
@@ -82,8 +63,7 @@ export default function ElectricianSilgiPage() {
 
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
           <p className="text-sm text-yellow-800">
-            ⚠️ 실기 학습 자료(회로도, 작업 영상, 결선 가이드)는 순차적으로 업데이트됩니다.
-            구체적인 학습 자료가 필요하면 커뮤니티에 요청해주세요.
+            ⚠️ 실기 학습 자료(회로도, 작업 영상, 결선 가이드)는 순차적으로 업데이트됩니다. 구체적인 학습 자료가 필요하면 커뮤니티에 요청해주세요.
           </p>
         </div>
       </div>
