@@ -10,6 +10,54 @@ export default function ElectricianSilgiPage() {
         <h1 className="text-3xl font-bold text-gray-800 mb-2">🔧 전기기능사 실기</h1>
         <p className="text-gray-500 mb-8">실기 시험 안내 및 학습 자료</p>
 
+        {/* 유튜브 시뮬레이터 튜토리얼 */}
+        <div className="bg-white rounded-2xl shadow p-6 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-gray-800">🎬 시뮬레이터 5분 튜토리얼</h2>
+            <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-1 rounded-full">YouTube</span>
+          </div>
+
+          <div className="relative w-full mb-3" style={{ paddingBottom: "56.25%" }}>
+            <iframe
+              src="https://www.youtube.com/embed/1Qi6cNonqzk"
+              title="전기 시뮬레이터(CraftsMan) 5분 튜토리얼"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="absolute top-0 left-0 w-full h-full rounded-xl"
+            />
+          </div>
+
+          <h3 className="font-semibold text-gray-800 text-sm mb-2">
+            전기 시뮬레이터(CraftsMan) 5분 튜토리얼 안내
+          </h3>
+          <p className="text-xs text-gray-500 mb-2">조회수 1,444회 · 2026. 4. 21.</p>
+
+          <p className="text-sm text-gray-700 leading-relaxed mb-3">
+            전기기능사 및 승강기기능사를 시뮬레이션 해볼 수 있는 프로그램 <strong>CraftsMan 베타버전</strong>이 출시되었습니다.
+            영상의 5분 튜토리얼 보시고 플레이해보세요!
+          </p>
+
+          
+            href="https://github.com/HuichaeStudio/CraftsMan"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-700 transition mb-3"
+          >
+            💾 CraftsMan 다운로드 (GitHub)
+          </a>
+
+          <div className="flex flex-wrap gap-1 mb-3">
+            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#전기기능사실기</span>
+            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#전기기능사</span>
+            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#craftsman</span>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+            ℹ️ 본 영상은 <strong>희채의 미래교실(정희채)</strong> 유튜브 채널의 허락(승인) 후 게재되었습니다.
+          </div>
+        </div>
+
+        {/* 시험 개요 */}
         <div className="bg-white rounded-2xl shadow p-6 mb-4">
           <h2 className="text-lg font-bold text-gray-800 mb-3">📋 시험 개요</h2>
           <ul className="text-sm text-gray-600 space-y-2">
@@ -20,6 +68,7 @@ export default function ElectricianSilgiPage() {
           </ul>
         </div>
 
+        {/* 학습 포인트 */}
         <div className="bg-white rounded-2xl shadow p-6 mb-4">
           <h2 className="text-lg font-bold text-gray-800 mb-3">📚 학습 포인트</h2>
           <ul className="text-sm text-gray-600 space-y-2">
