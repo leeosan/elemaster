@@ -35,8 +35,9 @@ export default function ElectricianSilgiPage() {
             <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#craftsman</span>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
-            ℹ️ 본 영상은 <strong>희채의 미래교실(정희채)</strong> 유튜브 채널의 허락(승인) 후 게재되었습니다.
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+            <p className="font-semibold mb-1">🎓 본 콘텐츠는 <strong>희채의 미래교실</strong> 정희채 선생님의 흔쾌한 승인을 받아 게재되었습니다.</p>
+            <p className="text-xs text-blue-700">현직 교사로서 후학 양성과 공익을 위해 자료를 공유해 주신 선생님께 깊이 감사드립니다.</p>
           </div>
         </div>
 
