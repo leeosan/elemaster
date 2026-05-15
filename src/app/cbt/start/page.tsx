@@ -251,11 +251,11 @@ function CBTStartInner() {
           <input
             type="number"
             min="1"
-            max={questions.length}
+            max={questions[questions.length - 1]?.question_number ?? questions.length}
             value={navSearch}
             onChange={e => setNavSearch(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleNavSearch()}
-            placeholder={`1-${questions.length}`}
+            placeholder={`1-${questions[questions.length - 1]?.question_number ?? questions.length}`}
             className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
           />
           <button onClick={handleNavSearch}
@@ -299,7 +299,7 @@ function CBTStartInner() {
                         onClick={() => { moveTo(idx); setShowNav(false) }}
                         className={cls}
                       >
-                        {idx + 1}
+                        {questions[idx]?.question_number ?? idx + 1}
                       </button>
                     )
                   })}
