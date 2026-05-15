@@ -225,10 +225,13 @@ function CBTStartInner() {
   // 번호 검색 → 해당 문제로 이동
   const handleNavSearch = () => {
     const n = parseInt(navSearch)
-    if (!isNaN(n) && n >= 1 && n <= questions.length) {
-      moveTo(n - 1)
-      setShowNav(false)
-      setNavSearch("")
+    if (!isNaN(n)) {
+      const targetIdx = questions.findIndex(q => q.question_number === n)
+      if (targetIdx >= 0) {
+        moveTo(targetIdx)
+        setShowNav(false)
+        setNavSearch("")
+      }
     }
   }
 
@@ -278,8 +281,13 @@ function CBTStartInner() {
 
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           {groups.map((grp, gIdx) => {
-            const start = gIdx * 10 + 1
-            const end = Math.min(start + 9, questions.length)
+            const firstIdx = gIdx * 10
+
+            const lastIdx = Math.min(firstIdx + 9, questions.length - 1)
+
+            const start = questions[firstIdx]?.question_number ?? firstIdx + 1
+
+            const end = questions[lastIdx]?.question_number ?? lastIdx + 1
             return (
               <div key={gIdx}>
                 <div className="text-xs text-gray-400 font-semibold mb-1.5">{start}-{end}</div>
