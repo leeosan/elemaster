@@ -49,8 +49,8 @@ function CBTStartInner() {
   // ✅ 학습 모드: "exam"(시험 모드) | "instant"(정답 모드 — 보기 클릭 즉시 채점)
   const [mode, setMode] = useState<"exam" | "instant">("exam")
 
-  // 🚨 오류 신고 상태
-  const [showReport, setShowReport] = useState(false)
+  // 🚨 오류 신고 상태 (reportTarget = 신고 대상 문제 객체, 풀이 중/제출 후 공용 모달)
+  const [reportTarget, setReportTarget] = useState<any>(null)
   const [reportType, setReportType] = useState("wrong_answer")
   const [reportDesc, setReportDesc] = useState("")
   const [reportSending, setReportSending] = useState(false)
@@ -177,15 +177,14 @@ function CBTStartInner() {
     }
   }
 
-  // 🚨 오류 신고 제출
+  // 🚨 오류 신고 제출 (풀이 중 / 제출 후 공용)
   const submitReport = async () => {
     if (!user) { alert("로그인이 필요합니다."); return }
-    const q = questions[current]
-    if (!q) return
+    if (!reportTarget) return
     setReportSending(true)
     const supabase = createClient()
     const { error } = await supabase.from("question_reports").insert({
-      question_id: q.id,
+      question_id: reportTarget.id,
       report_type: reportType,
       description: reportDesc.trim() || null,
       reporter_email: user.email,
@@ -195,11 +194,52 @@ function CBTStartInner() {
       alert("신고 접수에 실패했습니다. 잠시 후 다시 시도해주세요.")
       return
     }
-    setReportedIds(prev => new Set(prev).add(q.id))
-    setShowReport(false)
+    setReportedIds(prev => new Set(prev).add(reportTarget.id))
+    setReportTarget(null)
     setReportDesc("")
     setReportType("wrong_answer")
     alert("신고가 접수되었습니다. 검토 후 빠르게 반영하겠습니다. 감사합니다!")
+  }
+
+  // 🚨 신고 모달 (풀이 중 / 제출 후 화면 양쪽에서 렌더링)
+  const renderReportModal = () => {
+    if (!reportTarget) return null
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setReportTarget(null)}>
+        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold text-red-700">🚨 문제 오류 신고</p>
+            <button onClick={() => setReportTarget(null)} className="text-gray-400 text-2xl leading-none">×</button>
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 mb-3">
+            <p className="text-xs text-gray-400">{reportTarget.year}년 {reportTarget.round}회 · {reportTarget.question_number}번</p>
+            <p className="text-xs text-gray-600 mt-0.5">{reportTarget.question_text?.length > 60 ? reportTarget.question_text.slice(0, 60) + "..." : reportTarget.question_text}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {REPORT_TYPES.map(rt => (
+              <button key={rt.value} onClick={() => setReportType(rt.value)}
+                className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${reportType === rt.value
+                  ? "border-red-400 bg-red-50 font-semibold text-red-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-red-300"}`}>
+                <span className="block">{rt.label}</span>
+                <span className="block text-gray-400 mt-0.5">{rt.desc}</span>
+              </button>
+            ))}
+          </div>
+          <textarea value={reportDesc} onChange={e => setReportDesc(e.target.value)}
+            placeholder={reportType === "wrong_answer" ? "예: 정답이 3번이 아니라 2번입니다. 계산하면 1/√2가 나옵니다." : "오류 내용을 자세히 적어주시면 빠르게 수정할 수 있어요."}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 mb-3" rows={3} />
+          <div className="flex gap-2">
+            <button onClick={submitReport} disabled={reportSending}
+              className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 disabled:opacity-50">
+              {reportSending ? "접수 중..." : "신고 접수"}
+            </button>
+            <button onClick={() => setReportTarget(null)}
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-500 rounded-lg text-sm hover:bg-gray-50">취소</button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const getSingleAi = async (index: number, question: any) => {
@@ -261,7 +301,7 @@ function CBTStartInner() {
     setCurrent(idx)
     setShowExplanation(false)
     setShowNotes(false)
-    setShowReport(false)
+    setReportTarget(null)
     setNotes([])
     setMyNote("")
   }
@@ -284,13 +324,10 @@ function CBTStartInner() {
   // 번호 검색 → 해당 문제로 이동
   const handleNavSearch = () => {
     const n = parseInt(navSearch)
-    if (!isNaN(n)) {
-      const targetIdx = questions.findIndex(q => q.question_number === n)
-      if (targetIdx >= 0) {
-        moveTo(targetIdx)
-        setShowNav(false)
-        setNavSearch("")
-      }
+    if (!isNaN(n) && n >= 1 && n <= questions.length) {
+      moveTo(n - 1)
+      setShowNav(false)
+      setNavSearch("")
     }
   }
 
@@ -313,11 +350,11 @@ function CBTStartInner() {
           <input
             type="number"
             min="1"
-            max={questions[questions.length - 1]?.question_number ?? questions.length}
+            max={questions.length}
             value={navSearch}
             onChange={e => setNavSearch(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleNavSearch()}
-            placeholder={`1-${questions[questions.length - 1]?.question_number ?? questions.length}`}
+            placeholder={`1-${questions.length}`}
             className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
           />
           <button onClick={handleNavSearch}
@@ -347,13 +384,8 @@ function CBTStartInner() {
 
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           {groups.map((grp, gIdx) => {
-            const firstIdx = gIdx * 10
-
-            const lastIdx = Math.min(firstIdx + 9, questions.length - 1)
-
-            const start = questions[firstIdx]?.question_number ?? firstIdx + 1
-
-            const end = questions[lastIdx]?.question_number ?? lastIdx + 1
+            const start = gIdx * 10 + 1
+            const end = Math.min(start + 9, questions.length)
             return (
               <div key={gIdx}>
                 <div className="text-xs text-gray-400 font-semibold mb-1.5">{start}-{end}</div>
@@ -380,7 +412,7 @@ function CBTStartInner() {
                         onClick={() => { moveTo(idx); setShowNav(false) }}
                         className={cls}
                       >
-                        {questions[idx]?.question_number ?? idx + 1}
+                        {idx + 1}
                       </button>
                     )
                   })}
@@ -472,10 +504,18 @@ function CBTStartInner() {
                             <p>{q.explanation}</p>
                           </div>
                         )}
-                        <button onClick={() => getSingleAi(i + 1000, q)} disabled={singleAiLoading === i + 1000}
-                          className="w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
-                          {singleAiLoading === i + 1000 ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
-                        </button>
+                        <div className="flex gap-2">
+                          <button onClick={() => getSingleAi(i + 1000, q)} disabled={singleAiLoading === i + 1000}
+                            className="flex-1 py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
+                            {singleAiLoading === i + 1000 ? "🤖 생성 중..." : "🤖 AI 암기법 & 풀이 보기"}
+                          </button>
+                          <button onClick={() => { if (!reportedIds.has(q.id)) setReportTarget(q) }}
+                            className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${reportedIds.has(q.id)
+                              ? "bg-gray-100 text-gray-400 border-gray-200 cursor-default"
+                              : "bg-white text-red-500 border-red-200 hover:bg-red-50"}`}>
+                            {reportedIds.has(q.id) ? "✓ 신고됨" : "🚨 오류 신고"}
+                          </button>
+                        </div>
                         {singleAi[i + 1000] && (
                           <div className="mt-2 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                             {singleAi[i + 1000]}
@@ -489,6 +529,7 @@ function CBTStartInner() {
             </div>
           </div>
         </div>
+        {renderReportModal()}
       </div>
     )
   }
@@ -549,7 +590,7 @@ function CBTStartInner() {
               </div>
               <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                 {/* 🚨 오류 신고 버튼 */}
-                <button onClick={() => setShowReport(v => !v)}
+                <button onClick={() => { if (!reportedIds.has(q.id)) setReportTarget(q) }}
                   title="문제 오류 신고"
                   className={`text-xs px-2 py-1 rounded-lg border transition-all ${reportedIds.has(q.id)
                     ? "bg-gray-100 text-gray-400 border-gray-200 cursor-default"
@@ -561,35 +602,6 @@ function CBTStartInner() {
                 </button>
               </div>
             </div>
-
-            {/* 🚨 오류 신고 폼 */}
-            {showReport && !reportedIds.has(q.id) && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-                <p className="text-sm font-semibold text-red-700 mb-3">🚨 문제 오류 신고</p>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {REPORT_TYPES.map(rt => (
-                    <button key={rt.value} onClick={() => setReportType(rt.value)}
-                      className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${reportType === rt.value
-                        ? "border-red-400 bg-white font-semibold text-red-700"
-                        : "border-red-100 bg-white/60 text-gray-600 hover:border-red-300"}`}>
-                      <span className="block">{rt.label}</span>
-                      <span className="block text-gray-400 mt-0.5">{rt.desc}</span>
-                    </button>
-                  ))}
-                </div>
-                <textarea value={reportDesc} onChange={e => setReportDesc(e.target.value)}
-                  placeholder={reportType === "wrong_answer" ? "예: 정답이 3번이 아니라 2번입니다. 계산하면 1/√2가 나옵니다." : "오류 내용을 자세히 적어주시면 빠르게 수정할 수 있어요."}
-                  className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 bg-white mb-2" rows={3} />
-                <div className="flex gap-2">
-                  <button onClick={submitReport} disabled={reportSending}
-                    className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 disabled:opacity-50">
-                    {reportSending ? "접수 중..." : "신고 접수"}
-                  </button>
-                  <button onClick={() => setShowReport(false)}
-                    className="px-4 py-2 bg-white border border-gray-300 text-gray-500 rounded-lg text-sm hover:bg-gray-50">취소</button>
-                </div>
-              </div>
-            )}
 
             <p className="text-base font-medium text-gray-800 leading-relaxed mb-3 whitespace-pre-wrap">{q.question_number}. {q.question_text}</p>
 
@@ -754,6 +766,9 @@ function CBTStartInner() {
           </div>
         </div>
       )}
+
+      {/* 🚨 오류 신고 모달 */}
+      {renderReportModal()}
     </div>
   )
 }
