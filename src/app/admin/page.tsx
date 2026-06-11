@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation"
 
 const ADMIN_EMAIL = "jaetech01@gmail.com"
 
+// 신고 유형 라벨
+const REPORT_TYPE_LABELS: { [key: string]: string } = {
+  wrong_answer: "❌ 정답 오류",
+  wrong_content: "📝 문제/보기 오류",
+  wrong_image: "🖼 이미지 오류",
+  etc: "💬 기타",
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState("questions")
   const [authorized, setAuthorized] = useState(false)
@@ -33,6 +41,14 @@ export default function AdminPage() {
   const [selectedAiSet, setSelectedAiSet] = useState<number | null>(null)
   const [aiSetQuestions, setAiSetQuestions] = useState<any[]>([])
   const [aiSetLoading, setAiSetLoading] = useState(false)
+
+  // 🚨 신고 관리 상태
+  const [reports, setReports] = useState<any[]>([])
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportFilter, setReportFilter] = useState<"pending" | "all">("pending")
+  const [reportSaving, setReportSaving] = useState<number | null>(null)
+  const [pendingCount, setPendingCount] = useState(0)
+
   const router = useRouter()
 
   useEffect(() => {
@@ -42,9 +58,18 @@ export default function AdminPage() {
       if (!user || user.email !== ADMIN_EMAIL) { router.replace("/"); return }
       setAuthorized(true)
       fetchQuestions()
+      fetchPendingCount()
     }
     checkAuth()
   }, [])
+
+  const fetchPendingCount = async () => {
+    const supabase = createClient()
+    const { count } = await supabase.from("question_reports")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending")
+    setPendingCount(count || 0)
+  }
 
   const fetchQuestions = async () => {
     const supabase = createClient()
@@ -64,6 +89,66 @@ export default function AdminPage() {
     const uniqueYears = [...new Set(allData.map((q: any) => q.year))].sort((a, b) => b - a)
     setYears(uniqueYears)
     setLoading(false)
+  }
+
+  // 🚨 신고 목록 + 해당 문제 정보 조회
+  const fetchReports = async () => {
+    setReportsLoading(true)
+    const supabase = createClient()
+    let query = supabase.from("question_reports").select("*").order("created_at", { ascending: false })
+    if (reportFilter === "pending") query = query.eq("status", "pending")
+    const { data: rData } = await query
+    const reportList = rData || []
+    if (reportList.length === 0) { setReports([]); setReportsLoading(false); fetchPendingCount(); return }
+
+    const ids = [...new Set(reportList.map((r: any) => r.question_id))]
+    const { data: qData } = await supabase.from("questions")
+      .select("id, year, round, question_number, question_text, option_1, option_2, option_3, option_4, answer, image_url")
+      .in("id", ids)
+    const qMap = new Map((qData || []).map((q: any) => [q.id, q]))
+    setReports(reportList.map((r: any) => ({ ...r, question: qMap.get(r.question_id) })))
+    setReportsLoading(false)
+    fetchPendingCount()
+  }
+
+  useEffect(() => {
+    if (tab === "reports") fetchReports()
+  }, [reportFilter])
+
+  // 🚨 신고된 문제 정답 수정
+  const fixAnswer = async (report: any, newAnswer: number) => {
+    if (!confirm(`이 문제의 정답을 ${newAnswer}번으로 수정하시겠습니까?`)) return
+    setReportSaving(report.id)
+    const supabase = createClient()
+    const { error } = await supabase.from("questions").update({ answer: newAnswer }).eq("id", report.question_id)
+    if (error) { alert("정답 수정 실패: " + error.message); setReportSaving(null); return }
+    // 신고 목록 내 문제 정보 갱신 (같은 question_id 신고 모두)
+    setReports(prev => prev.map(r =>
+      r.question_id === report.question_id && r.question
+        ? { ...r, question: { ...r.question, answer: newAnswer } }
+        : r
+    ))
+    setQuestions(prev => prev.map(q => q.id === report.question_id ? { ...q, answer: newAnswer } : q))
+    setReportSaving(null)
+  }
+
+  // 🚨 신고 상태 변경 (처리완료 / 반려)
+  const resolveReport = async (report: any, status: "resolved" | "rejected", note?: string) => {
+    setReportSaving(report.id)
+    const supabase = createClient()
+    const { error } = await supabase.from("question_reports").update({
+      status,
+      admin_note: note || null,
+      resolved_at: new Date().toISOString(),
+    }).eq("id", report.id)
+    if (error) { alert("처리 실패: " + error.message); setReportSaving(null); return }
+    if (reportFilter === "pending") {
+      setReports(prev => prev.filter(r => r.id !== report.id))
+    } else {
+      setReports(prev => prev.map(r => r.id === report.id ? { ...r, status } : r))
+    }
+    setReportSaving(null)
+    fetchPendingCount()
   }
 
   const fetchUsers = async () => {
@@ -169,6 +254,7 @@ export default function AdminPage() {
     if (t === "posts") fetchPosts()
     if (t === "ai") fetchAiSets()
     if (t === "topics") fetchTopics(topicSubject)
+    if (t === "reports") fetchReports()
   }
 
   const updateField = async (id: number, field: string, value: any) => {
@@ -308,13 +394,14 @@ export default function AdminPage() {
           <div className="flex gap-2 mb-3 overflow-x-auto">
             {[
               { key: "questions", label: "📝 문제 설정" },
+              { key: "reports", label: `🚨 신고 관리${pendingCount > 0 ? ` (${pendingCount})` : ""}` },
               { key: "ai", label: "🤖 AI 추천 관리" },
               { key: "topics", label: "📊 빈출 분석" },
               { key: "users", label: "👥 회원 관리" },
               { key: "posts", label: "💬 게시판 관리" },
             ].map(t => (
               <button key={t.key} onClick={() => handleTabChange(t.key)}
-                className={"px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap " + (tab === t.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600")}>
+                className={"px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap " + (tab === t.key ? "bg-blue-600 text-white" : t.key === "reports" && pendingCount > 0 ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600")}>
                 {t.label}
               </button>
             ))}
@@ -330,6 +417,19 @@ export default function AdminPage() {
                 {years.map(y => <option key={y} value={y}>{y}년</option>)}
               </select>
               <span className="text-xs text-gray-400 self-center">{filtered.length}문제</span>
+            </div>
+          )}
+          {tab === "reports" && (
+            <div className="flex gap-2">
+              <button onClick={() => setReportFilter("pending")}
+                className={"px-3 py-1.5 rounded-lg text-xs font-semibold " + (reportFilter === "pending" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600")}>
+                ⏳ 대기중
+              </button>
+              <button onClick={() => setReportFilter("all")}
+                className={"px-3 py-1.5 rounded-lg text-xs font-semibold " + (reportFilter === "all" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600")}>
+                전체
+              </button>
+              <span className="text-xs text-gray-400 self-center">{reports.length}건</span>
             </div>
           )}
           {tab === "users" && (
@@ -353,6 +453,93 @@ export default function AdminPage() {
 
         {/* 문제 설정 */}
         {tab === "questions" && <QuestionTable data={filtered} />}
+
+        {/* 🚨 신고 관리 */}
+        {tab === "reports" && (
+          <div>
+            {reportsLoading ? (
+              <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">불러오는 중...</div>
+            ) : reports.length === 0 ? (
+              <div className="bg-white rounded-xl shadow p-8 text-center">
+                <p className="text-3xl mb-2">✨</p>
+                <p className="text-gray-500 text-sm">{reportFilter === "pending" ? "대기중인 신고가 없습니다" : "신고 내역이 없습니다"}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {reports.map(r => (
+                  <div key={r.id} className={"bg-white rounded-xl shadow p-5 border-l-4 " + (r.status === "pending" ? "border-red-400" : r.status === "resolved" ? "border-green-400" : "border-gray-300")}>
+                    {/* 신고 헤더 */}
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">
+                          {REPORT_TYPE_LABELS[r.report_type] || r.report_type}
+                        </span>
+                        {r.status === "resolved" && <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-0.5 rounded-full">✓ 처리완료</span>}
+                        {r.status === "rejected" && <span className="text-xs bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">반려</span>}
+                        <span className="text-xs text-gray-400">{formatDate(r.created_at)} · {r.reporter_email}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 font-mono">문제 id: {r.question_id}</span>
+                    </div>
+
+                    {/* 신고 내용 */}
+                    {r.description && (
+                      <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3 text-sm text-gray-700">
+                        💬 {r.description}
+                      </div>
+                    )}
+
+                    {/* 문제 내용 */}
+                    {r.question ? (
+                      <div className="bg-gray-50 rounded-lg p-4 mb-3">
+                        <p className="text-xs text-gray-400 mb-1">{r.question.year}년 {r.question.round}회 · {r.question.question_number}번</p>
+                        <p className="text-sm text-gray-800 mb-3 whitespace-pre-wrap">{r.question.question_text}</p>
+                        {r.question.image_url && (
+                          <img src={r.question.image_url} alt="문제 이미지" className="max-w-full rounded-lg border border-gray-200 mb-3" style={{ maxHeight: "180px" }} />
+                        )}
+                        {/* 보기 + 정답 즉시 수정 버튼 */}
+                        <p className="text-xs font-semibold text-gray-500 mb-2">보기 클릭 = 해당 번호를 정답으로 수정</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {[1, 2, 3, 4].map(num => (
+                            <button key={num}
+                              onClick={() => fixAnswer(r, num)}
+                              disabled={reportSaving === r.id}
+                              className={"text-left px-3 py-2 rounded-lg border text-sm transition-all disabled:opacity-50 " + (r.question.answer === num
+                                ? "border-green-500 bg-green-50 text-green-700 font-semibold"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-blue-400 hover:bg-blue-50")}>
+                              {r.question.answer === num && <span className="mr-1">✅ 현재정답</span>}
+                              {["①", "②", "③", "④"][num - 1]} {r.question[`option_${num}`] || "-"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-4 mb-3 text-sm text-gray-400">문제 정보를 찾을 수 없습니다 (삭제되었을 수 있음)</div>
+                    )}
+
+                    {/* 처리 버튼 */}
+                    {r.status === "pending" && (
+                      <div className="flex gap-2">
+                        <button onClick={() => resolveReport(r, "resolved", "정답/내용 확인 및 수정 완료")}
+                          disabled={reportSaving === r.id}
+                          className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
+                          {reportSaving === r.id ? "처리 중..." : "✓ 처리완료"}
+                        </button>
+                        <button onClick={() => resolveReport(r, "rejected", "오류 아님 확인")}
+                          disabled={reportSaving === r.id}
+                          className="px-4 py-2 bg-white border border-gray-300 text-gray-500 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50">
+                          반려
+                        </button>
+                      </div>
+                    )}
+                    {r.status !== "pending" && r.admin_note && (
+                      <p className="text-xs text-gray-400">관리자 메모: {r.admin_note}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* AI 추천 관리 */}
         {tab === "ai" && (

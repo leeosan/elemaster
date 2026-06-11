@@ -1,9 +1,17 @@
-﻿"use client"
+"use client"
 import { useState, useEffect, Suspense } from "react"
 import { createClient } from "@/lib/supabase"
 import { useSearchParams, useRouter } from "next/navigation"
 
 const ADMIN_EMAIL = "jaetech01@gmail.com"
+
+// 신고 유형 정의
+const REPORT_TYPES = [
+  { value: "wrong_answer", label: "❌ 정답 오류", desc: "표시된 정답이 틀렸어요" },
+  { value: "wrong_content", label: "📝 문제/보기 오류", desc: "문제 본문이나 보기에 오타·오류가 있어요" },
+  { value: "wrong_image", label: "🖼 이미지 오류", desc: "이미지가 잘못됐거나 안 보여요" },
+  { value: "etc", label: "💬 기타", desc: "그 외 문제점" },
+]
 
 function CBTStartInner() {
   const searchParams = useSearchParams()
@@ -34,9 +42,30 @@ function CBTStartInner() {
   const [singleAi, setSingleAi] = useState<{[key: number]: string}>({})
   const [singleAiLoading, setSingleAiLoading] = useState<number | null>(null)
 
-  // 신규: 문제 네비게이션 상태
+  // 문제 네비게이션 상태
   const [showNav, setShowNav] = useState(false)
   const [navSearch, setNavSearch] = useState("")
+
+  // ✅ 학습 모드: "exam"(시험 모드) | "instant"(정답 모드 — 보기 클릭 즉시 채점)
+  const [mode, setMode] = useState<"exam" | "instant">("exam")
+
+  // 🚨 오류 신고 상태
+  const [showReport, setShowReport] = useState(false)
+  const [reportType, setReportType] = useState("wrong_answer")
+  const [reportDesc, setReportDesc] = useState("")
+  const [reportSending, setReportSending] = useState(false)
+  const [reportedIds, setReportedIds] = useState<Set<number>>(new Set())
+
+  // 모드 설정 불러오기 (localStorage)
+  useEffect(() => {
+    const saved = localStorage.getItem("cbt_mode")
+    if (saved === "instant" || saved === "exam") setMode(saved)
+  }, [])
+
+  const changeMode = (m: "exam" | "instant") => {
+    setMode(m)
+    localStorage.setItem("cbt_mode", m)
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -79,8 +108,9 @@ function CBTStartInner() {
     load()
   }, [examId, year, round, aiset])
 
+  // 타이머: 정답 모드에서는 시간 제한 없음
   useEffect(() => {
-    if (finished || loading) return
+    if (finished || loading || mode === "instant") return
     const timer = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) { clearInterval(timer); setFinished(true); return 0 }
@@ -88,7 +118,7 @@ function CBTStartInner() {
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [finished, loading])
+  }, [finished, loading, mode])
 
   const fetchNotes = async (questionId: number) => {
     setNotesLoading(true)
@@ -145,6 +175,31 @@ function CBTStartInner() {
       await supabase.from("bookmarks").insert({ user_id: user.id, question_id: questionId })
       setBookmarks(prev => new Set(prev).add(questionId))
     }
+  }
+
+  // 🚨 오류 신고 제출
+  const submitReport = async () => {
+    if (!user) { alert("로그인이 필요합니다."); return }
+    const q = questions[current]
+    if (!q) return
+    setReportSending(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("question_reports").insert({
+      question_id: q.id,
+      report_type: reportType,
+      description: reportDesc.trim() || null,
+      reporter_email: user.email,
+    })
+    setReportSending(false)
+    if (error) {
+      alert("신고 접수에 실패했습니다. 잠시 후 다시 시도해주세요.")
+      return
+    }
+    setReportedIds(prev => new Set(prev).add(q.id))
+    setShowReport(false)
+    setReportDesc("")
+    setReportType("wrong_answer")
+    alert("신고가 접수되었습니다. 검토 후 빠르게 반영하겠습니다. 감사합니다!")
   }
 
   const getSingleAi = async (index: number, question: any) => {
@@ -206,6 +261,7 @@ function CBTStartInner() {
     setCurrent(idx)
     setShowExplanation(false)
     setShowNotes(false)
+    setShowReport(false)
     setNotes([])
     setMyNote("")
   }
@@ -218,8 +274,11 @@ function CBTStartInner() {
 
   const selectAnswer = (num: number) => {
     if (finished) return
+    // 정답 모드: 이미 답을 선택한 문제는 변경 불가 (정답이 노출됐으므로)
+    if (mode === "instant" && answers[current] !== undefined) return
     setAnswers(prev => ({ ...prev, [current]: num }))
-    setShowExplanation(false)
+    // 정답 모드: 선택 즉시 해설 자동 펼침
+    setShowExplanation(mode === "instant")
   }
 
   // 번호 검색 → 해당 문제로 이동
@@ -274,7 +333,14 @@ function CBTStartInner() {
 
         <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3 text-xs text-gray-500">
           <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-600 rounded"></span>현재</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 border border-green-400 rounded"></span>완료</span>
+          {mode === "instant" ? (
+            <>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 border border-green-400 rounded"></span>정답</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 border border-red-400 rounded"></span>오답</span>
+            </>
+          ) : (
+            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 border border-green-400 rounded"></span>완료</span>
+          )}
           <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-100 border border-gray-300 rounded"></span>미답</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 bg-white border-2 border-yellow-400 rounded"></span>북마크</span>
         </div>
@@ -296,8 +362,15 @@ function CBTStartInner() {
                     const isAnswered = answers[idx] !== undefined
                     const isCurrent = idx === current
                     const isBookmarked = questions[idx] && bookmarks.has(questions[idx].id)
+                    // 정답 모드: 정답/오답 색상 구분 표시
+                    const isCorrectAns = isAnswered && questions[idx] && answers[idx] === questions[idx].answer
                     let cls = "aspect-square rounded-lg text-xs font-bold border transition-all flex items-center justify-center "
                     if (isCurrent) cls += "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-300 "
+                    else if (isAnswered && mode === "instant") {
+                      cls += isCorrectAns
+                        ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 "
+                        : "bg-red-100 text-red-600 border-red-300 hover:bg-red-200 "
+                    }
                     else if (isAnswered) cls += "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 "
                     else cls += "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200 "
                     if (isBookmarked && !isCurrent) cls += "ring-2 ring-yellow-400 "
@@ -421,14 +494,34 @@ function CBTStartInner() {
   }
 
   const q = questions[current]
+  const answered = answers[current] !== undefined
+  const isCorrectNow = answered && answers[current] === q.answer
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm sticky top-0 z-10 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <span className="text-sm font-semibold text-gray-600">{current + 1} / {questions.length}</span>
-          <span className={`text-lg font-bold ${timeLeft < 300 ? "text-red-500" : "text-blue-600"}`}>⏱ {formatTime(timeLeft)}</span>
-          <button onClick={async () => { setFinished(true); await saveWrongAnswers() }} className="text-sm bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600">제출</button>
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-gray-600 flex-shrink-0">{current + 1} / {questions.length}</span>
+
+          {/* 모드 토글 */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold flex-shrink-0">
+            <button onClick={() => changeMode("exam")}
+              className={`px-3 py-1.5 transition-all ${mode === "exam" ? "bg-blue-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
+              📝 시험 모드
+            </button>
+            <button onClick={() => changeMode("instant")}
+              className={`px-3 py-1.5 transition-all ${mode === "instant" ? "bg-green-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
+              ✅ 정답 모드
+            </button>
+          </div>
+
+          {mode === "exam" ? (
+            <span className={`text-lg font-bold flex-shrink-0 ${timeLeft < 300 ? "text-red-500" : "text-blue-600"}`}>⏱ {formatTime(timeLeft)}</span>
+          ) : (
+            <span className="text-xs font-semibold text-green-600 flex-shrink-0 hidden sm:inline">⏱ 시간 제한 없음</span>
+          )}
+
+          <button onClick={async () => { setFinished(true); await saveWrongAnswers() }} className="text-sm bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 flex-shrink-0">제출</button>
         </div>
         <div className="max-w-6xl mx-auto mt-2 bg-gray-200 rounded-full h-1.5">
           <div className="bg-blue-600 h-1.5 rounded-full transition-all" style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
@@ -454,10 +547,50 @@ function CBTStartInner() {
                 {q.importance === "필수" && <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">⭐ 필수문제</span>}
                 {q.importance === "중요" && <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">✨ 중요문제</span>}
               </div>
-              <button onClick={() => toggleBookmark(q.id)} className="text-xl ml-2 flex-shrink-0">
-                {bookmarks.has(q.id) ? "🔖" : "📄"}
-              </button>
+              <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                {/* 🚨 오류 신고 버튼 */}
+                <button onClick={() => setShowReport(v => !v)}
+                  title="문제 오류 신고"
+                  className={`text-xs px-2 py-1 rounded-lg border transition-all ${reportedIds.has(q.id)
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-default"
+                    : "bg-white text-red-500 border-red-200 hover:bg-red-50"}`}>
+                  {reportedIds.has(q.id) ? "✓ 신고됨" : "🚨 오류 신고"}
+                </button>
+                <button onClick={() => toggleBookmark(q.id)} className="text-xl">
+                  {bookmarks.has(q.id) ? "🔖" : "📄"}
+                </button>
+              </div>
             </div>
+
+            {/* 🚨 오류 신고 폼 */}
+            {showReport && !reportedIds.has(q.id) && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <p className="text-sm font-semibold text-red-700 mb-3">🚨 문제 오류 신고</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {REPORT_TYPES.map(rt => (
+                    <button key={rt.value} onClick={() => setReportType(rt.value)}
+                      className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${reportType === rt.value
+                        ? "border-red-400 bg-white font-semibold text-red-700"
+                        : "border-red-100 bg-white/60 text-gray-600 hover:border-red-300"}`}>
+                      <span className="block">{rt.label}</span>
+                      <span className="block text-gray-400 mt-0.5">{rt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <textarea value={reportDesc} onChange={e => setReportDesc(e.target.value)}
+                  placeholder={reportType === "wrong_answer" ? "예: 정답이 3번이 아니라 2번입니다. 계산하면 1/√2가 나옵니다." : "오류 내용을 자세히 적어주시면 빠르게 수정할 수 있어요."}
+                  className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 bg-white mb-2" rows={3} />
+                <div className="flex gap-2">
+                  <button onClick={submitReport} disabled={reportSending}
+                    className="flex-1 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 disabled:opacity-50">
+                    {reportSending ? "접수 중..." : "신고 접수"}
+                  </button>
+                  <button onClick={() => setShowReport(false)}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-500 rounded-lg text-sm hover:bg-gray-50">취소</button>
+                </div>
+              </div>
+            )}
+
             <p className="text-base font-medium text-gray-800 leading-relaxed mb-3 whitespace-pre-wrap">{q.question_number}. {q.question_text}</p>
 
             {q.duplicate_cnt >= 2 && (
@@ -477,17 +610,42 @@ function CBTStartInner() {
             )}
           </div>
 
+          {/* ✅ 정답 모드: 채점 결과 배너 */}
+          {mode === "instant" && answered && (
+            <div className={`rounded-xl px-4 py-3 mb-3 flex items-center gap-2 border ${isCorrectNow
+              ? "bg-green-50 border-green-300"
+              : "bg-red-50 border-red-300"}`}>
+              <span className="text-xl">{isCorrectNow ? "⭕" : "❌"}</span>
+              <p className={`text-sm font-semibold ${isCorrectNow ? "text-green-700" : "text-red-600"}`}>
+                {isCorrectNow ? "정답입니다!" : `오답입니다. 정답은 ${q.answer}번입니다.`}
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 mb-4">
-            {[1, 2, 3, 4].map(num => (
-              <button key={num} onClick={() => selectAnswer(num)}
-                className={`w-full text-left px-5 py-4 rounded-xl border-2 text-sm font-medium transition-all
-                  ${answers[current] === num ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-700 hover:border-blue-300"}`}>
-                {num}. <RenderOption text={q[`option_${num}`]} />
-              </button>
-            ))}
+            {[1, 2, 3, 4].map(num => {
+              let cls = "w-full text-left px-5 py-4 rounded-xl border-2 text-sm font-medium transition-all "
+              if (mode === "instant" && answered) {
+                // 정답 모드 + 답 선택 후: 정답/오답 색상 표시
+                if (num === q.answer) cls += "border-green-500 bg-green-50 text-green-700 font-semibold"
+                else if (num === answers[current]) cls += "border-red-400 bg-red-50 text-red-600"
+                else cls += "border-gray-200 bg-white text-gray-400"
+              } else {
+                cls += answers[current] === num
+                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-700 hover:border-blue-300"
+              }
+              return (
+                <button key={num} onClick={() => selectAnswer(num)} className={cls}>
+                  {mode === "instant" && answered && num === q.answer && <span className="mr-1">✅</span>}
+                  {mode === "instant" && answered && num === answers[current] && num !== q.answer && <span className="mr-1">❌</span>}
+                  {num}. <RenderOption text={q[`option_${num}`]} />
+                </button>
+              )
+            })}
           </div>
 
-          {answers[current] && (
+          {answered && (
             <button onClick={() => setShowExplanation(!showExplanation)} className="w-full py-2 text-sm text-blue-600 hover:underline mb-3">
               {showExplanation ? "해설 닫기 ▲" : "해설 보기 ▼"}
             </button>
@@ -499,7 +657,7 @@ function CBTStartInner() {
             </div>
           )}
 
-          {answers[current] && (
+          {answered && (
             <div className="mb-3">
               <button onClick={() => getSingleAi(current, questions[current])} disabled={singleAiLoading === current}
                 className="w-full py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 disabled:opacity-50">
