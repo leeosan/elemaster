@@ -244,6 +244,18 @@ function CBTStartInner() {
 
   const getSingleAi = async (index: number, question: any) => {
     setSingleAiLoading(index)
+    // ① 관리자가 등록/편집한 풀이(ai_explanations)가 있으면 우선 표시
+    try {
+      const supabase = createClient()
+      const { data: saved } = await supabase.from("ai_explanations")
+        .select("content").eq("question_id", question.id).maybeSingle()
+      if (saved?.content) {
+        setSingleAi(prev => ({ ...prev, [index]: saved.content }))
+        setSingleAiLoading(null)
+        return
+      }
+    } catch { /* 저장 풀이 조회 실패 시 AI 생성으로 진행 */ }
+    // ② 저장된 풀이가 없으면 AI 생성
     try {
       const res = await fetch("/api/ai-analysis", {
         method: "POST",

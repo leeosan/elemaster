@@ -49,6 +49,13 @@ export default function AdminPage() {
   const [reportSaving, setReportSaving] = useState<number | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
 
+  // ✏️ AI 풀이(ai_explanations) 편집 상태
+  const [aiEditId, setAiEditId] = useState<number | null>(null)      // 편집 중인 question_id
+  const [aiEditContent, setAiEditContent] = useState("")
+  const [aiEditLoading, setAiEditLoading] = useState(false)
+  const [aiEditSaving, setAiEditSaving] = useState(false)
+  const [aiEditExists, setAiEditExists] = useState(false)            // 기존 풀이 존재 여부
+
   const router = useRouter()
 
   useEffect(() => {
@@ -149,6 +156,91 @@ export default function AdminPage() {
     }
     setReportSaving(null)
     fetchPendingCount()
+  }
+
+  // ✏️ AI 풀이 편집기 열기 (기존 내용 불러오기)
+  const openAiEditor = async (questionId: number) => {
+    if (aiEditId === questionId) { setAiEditId(null); setAiEditContent(""); return }
+    setAiEditId(questionId)
+    setAiEditLoading(true)
+    setAiEditContent("")
+    const supabase = createClient()
+    const { data } = await supabase.from("ai_explanations")
+      .select("content").eq("question_id", questionId).maybeSingle()
+    setAiEditContent(data?.content || "")
+    setAiEditExists(!!data?.content)
+    setAiEditLoading(false)
+  }
+
+  // ✏️ AI 풀이 저장 (등록/수정)
+  const saveAiExplanation = async () => {
+    if (aiEditId === null) return
+    if (!aiEditContent.trim()) { alert("풀이 내용을 입력해주세요."); return }
+    setAiEditSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("ai_explanations").upsert({
+      question_id: aiEditId,
+      content: aiEditContent.trim(),
+      created_at: new Date().toISOString(),
+    }, { onConflict: "question_id" })
+    setAiEditSaving(false)
+    if (error) { alert("저장 실패: " + error.message); return }
+    setAiEditExists(true)
+    alert("AI 풀이가 저장되었습니다. 사용자 화면에서 이 풀이가 우선 표시됩니다.")
+  }
+
+  // ✏️ AI 풀이 삭제 (삭제하면 사용자 화면에서 다시 AI 자동 생성)
+  const deleteAiExplanation = async () => {
+    if (aiEditId === null) return
+    if (!confirm("이 문제의 저장된 AI 풀이를 삭제하시겠습니까?\n삭제하면 사용자 화면에서 다시 AI가 자동 생성합니다.")) return
+    setAiEditSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("ai_explanations").delete().eq("question_id", aiEditId)
+    setAiEditSaving(false)
+    if (error) { alert("삭제 실패: " + error.message); return }
+    setAiEditContent("")
+    setAiEditExists(false)
+    alert("삭제되었습니다.")
+  }
+
+  // ✏️ AI 풀이 편집기 공용 렌더링
+  const renderAiEditor = (questionId: number) => {
+    if (aiEditId !== questionId) return null
+    return (
+      <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mt-2">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-purple-700">
+            🤖 AI 암기법 & 풀이 편집 {aiEditExists
+              ? <span className="text-xs bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full ml-1">저장된 풀이 있음</span>
+              : <span className="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full ml-1">미등록 (AI 자동생성 중)</span>}
+          </p>
+          <button onClick={() => { setAiEditId(null); setAiEditContent("") }} className="text-gray-400 text-xl leading-none">×</button>
+        </div>
+        {aiEditLoading ? (
+          <p className="text-xs text-gray-400 text-center py-6">불러오는 중...</p>
+        ) : (
+          <>
+            <textarea value={aiEditContent} onChange={e => setAiEditContent(e.target.value)}
+              placeholder={"정답: ② ...\n\n【풀이】\n...\n\n【핵심 포인트 / 암기법】\n..."}
+              className="w-full border border-purple-200 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:border-purple-400 bg-white font-mono leading-relaxed"
+              rows={12} />
+            <p className="text-xs text-gray-400 mt-1 mb-2">💡 저장하면 사용자의 "AI 암기법 & 풀이 보기"에서 이 내용이 우선 표시됩니다. 삭제하면 다시 AI 자동 생성으로 돌아갑니다.</p>
+            <div className="flex gap-2">
+              <button onClick={saveAiExplanation} disabled={aiEditSaving}
+                className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-50">
+                {aiEditSaving ? "저장 중..." : "💾 저장"}
+              </button>
+              {aiEditExists && (
+                <button onClick={deleteAiExplanation} disabled={aiEditSaving}
+                  className="px-4 py-2 bg-white border border-red-300 text-red-500 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50">
+                  삭제
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    )
   }
 
   const fetchUsers = async () => {
@@ -346,34 +438,52 @@ export default function AdminPage() {
             <th className="px-4 py-3 text-left">문제</th>
             <th className="px-4 py-3 text-center w-24">출제기준변경</th>
             <th className="px-4 py-3 text-center w-28">중요도</th>
+            <th className="px-4 py-3 text-center w-20">AI풀이</th>
             <th className="px-4 py-3 text-center w-16">저장</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {data.map(q => (
-            <tr key={q.id} className={"hover:bg-gray-50 " + (q.is_deprecated ? "bg-red-50" : "")}>
-              <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{q.year}년<br/>{q.round}회</td>
-              <td className="px-4 py-3 text-gray-700">
-                <span className="text-gray-400 mr-1">{q.question_number}.</span>
-                {q.question_text?.length > 60 ? q.question_text.slice(0, 60) + "..." : q.question_text}
-              </td>
-              <td className="px-4 py-3 text-center">
-                <input type="checkbox" checked={!!q.is_deprecated}
-                  onChange={e => updateField(q.id, "is_deprecated", e.target.checked)}
-                  className="w-4 h-4 accent-red-500 cursor-pointer" />
-              </td>
-              <td className="px-4 py-3 text-center">
-                <select value={q.importance || ""} onChange={e => updateField(q.id, "importance", e.target.value || null)}
-                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-full">
-                  <option value="">없음</option>
-                  <option value="필수">⭐ 필수</option>
-                  <option value="중요">✨ 중요</option>
-                </select>
-              </td>
-              <td className="px-4 py-3 text-center">
-                {saving === q.id ? <span className="text-xs text-blue-500">저장중...</span> : <span className="text-xs text-green-500">✓</span>}
-              </td>
-            </tr>
+            <React.Fragment key={q.id}>
+              <tr className={"hover:bg-gray-50 " + (q.is_deprecated ? "bg-red-50" : "") + (aiEditId === q.id ? " bg-purple-50" : "")}>
+                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{q.year}년<br/>{q.round}회</td>
+                <td className="px-4 py-3 text-gray-700">
+                  <span className="text-gray-400 mr-1">{q.question_number}.</span>
+                  {q.question_text?.length > 60 ? q.question_text.slice(0, 60) + "..." : q.question_text}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <input type="checkbox" checked={!!q.is_deprecated}
+                    onChange={e => updateField(q.id, "is_deprecated", e.target.checked)}
+                    className="w-4 h-4 accent-red-500 cursor-pointer" />
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <select value={q.importance || ""} onChange={e => updateField(q.id, "importance", e.target.value || null)}
+                    className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-full">
+                    <option value="">없음</option>
+                    <option value="필수">⭐ 필수</option>
+                    <option value="중요">✨ 중요</option>
+                  </select>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <button onClick={() => openAiEditor(q.id)}
+                    className={"text-xs rounded-lg px-2 py-1 border transition-all " + (aiEditId === q.id
+                      ? "bg-purple-600 text-white border-purple-600"
+                      : "bg-white text-purple-600 border-purple-200 hover:bg-purple-50")}>
+                    {aiEditId === q.id ? "✏️ 편집중" : "✏️ 편집"}
+                  </button>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {saving === q.id ? <span className="text-xs text-blue-500">저장중...</span> : <span className="text-xs text-green-500">✓</span>}
+                </td>
+              </tr>
+              {aiEditId === q.id && (
+                <tr>
+                  <td colSpan={6} className="px-4 pb-4 bg-purple-50/50">
+                    {renderAiEditor(q.id)}
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
           ))}
         </tbody>
       </table>
@@ -511,6 +621,14 @@ export default function AdminPage() {
                             </button>
                           ))}
                         </div>
+                        {/* ✏️ AI 풀이 편집 */}
+                        <button onClick={() => openAiEditor(r.question_id)}
+                          className={"mt-2 w-full py-2 rounded-lg text-sm font-semibold border transition-all " + (aiEditId === r.question_id
+                            ? "bg-purple-600 text-white border-purple-600"
+                            : "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100")}>
+                          {aiEditId === r.question_id ? "✏️ AI 풀이 편집 닫기" : "🤖 AI 암기법 & 풀이 편집"}
+                        </button>
+                        {renderAiEditor(r.question_id)}
                       </div>
                     ) : (
                       <div className="bg-gray-50 rounded-lg p-4 mb-3 text-sm text-gray-400">문제 정보를 찾을 수 없습니다 (삭제되었을 수 있음)</div>
