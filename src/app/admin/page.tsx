@@ -62,6 +62,7 @@ export default function AdminPage() {
   const [qEditLoading, setQEditLoading] = useState(false)
   const [qEditSaving, setQEditSaving] = useState(false)
   const [qImgUploading, setQImgUploading] = useState(false)
+  const [optImgUploading, setOptImgUploading] = useState<number | null>(null)  // 보기 이미지 업로드 중인 번호
 
   const router = useRouter()
 
@@ -264,23 +265,36 @@ export default function AdminPage() {
     setQEditLoading(false)
   }
 
-  // ✏️ 이미지 파일 업로드 → exam-images 버킷 → public URL을 image_url에 반영
-  const uploadQuestionImage = async (file: File) => {
-    if (!qEditData) return
-    setQImgUploading(true)
+  // ✏️ 이미지 파일 업로드 → exam-images 버킷 → public URL 반환 (공용)
+  const uploadToBucket = async (file: File): Promise<string | null> => {
     const supabase = createClient()
-    // 확장자 소문자화 (.PNG → .png), 허용 확장자만 사용
     let ext = (file.name.split(".").pop() || "png").toLowerCase()
     if (!["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) ext = "png"
-    // 한글/특수문자 없는 안전한 경로
-    const path = `nu_edit_${qEditId}_${Date.now()}.${ext}`
+    const path = `nu_edit_${qEditId}_${Date.now()}_${Math.floor(Math.random()*1000)}.${ext}`
     const { error: upErr } = await supabase.storage.from("exam-images").upload(path, file, {
       cacheControl: "3600", upsert: true, contentType: file.type || `image/${ext}`,
     })
-    if (upErr) { alert("이미지 업로드 실패: " + upErr.message); setQImgUploading(false); return }
+    if (upErr) { alert("이미지 업로드 실패: " + upErr.message); return null }
     const { data: pub } = supabase.storage.from("exam-images").getPublicUrl(path)
-    setQEditData((prev: any) => ({ ...prev, image_url: pub.publicUrl }))
+    return pub.publicUrl
+  }
+
+  // ✏️ 문제 이미지 업로드
+  const uploadQuestionImage = async (file: File) => {
+    if (!qEditData) return
+    setQImgUploading(true)
+    const url = await uploadToBucket(file)
+    if (url) setQEditData((prev: any) => ({ ...prev, image_url: url }))
     setQImgUploading(false)
+  }
+
+  // ✏️ 보기(option) 이미지 업로드 → 해당 보기를 ![](url) 마크다운으로 채움
+  const uploadOptionImage = async (num: number, file: File) => {
+    if (!qEditData) return
+    setOptImgUploading(num)
+    const url = await uploadToBucket(file)
+    if (url) setQEditData((prev: any) => ({ ...prev, [`option_${num}`]: `![](${url})` }))
+    setOptImgUploading(null)
   }
 
   // ✏️ 문제 편집 저장
@@ -325,20 +339,39 @@ export default function AdminPage() {
               onChange={e => setQEditData((p: any) => ({ ...p, question_text: e.target.value }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:border-blue-400 bg-white mb-3" rows={3} />
 
-            {/* 보기 1~4 + 정답 라디오 */}
-            <label className="block text-xs font-semibold text-gray-600 mb-1">보기 (왼쪽 ○ = 정답)</label>
+            {/* 보기 1~4 + 정답 라디오 + 보기별 이미지 */}
+            <label className="block text-xs font-semibold text-gray-600 mb-1">보기 (왼쪽 ○ = 정답 · 📎 = 이미지 보기로 전환)</label>
             <div className="space-y-2 mb-3">
-              {[1, 2, 3, 4].map(num => (
-                <div key={num} className="flex items-center gap-2">
-                  <input type="radio" name={`ans_${questionId}`} checked={qEditData.answer === num}
-                    onChange={() => setQEditData((p: any) => ({ ...p, answer: num }))}
-                    className="w-4 h-4 accent-green-600 cursor-pointer flex-shrink-0" title="정답으로 지정" />
-                  <span className="text-sm text-gray-400 flex-shrink-0">{["①", "②", "③", "④"][num - 1]}</span>
-                  <input type="text" value={qEditData[`option_${num}`] || ""}
-                    onChange={e => setQEditData((p: any) => ({ ...p, [`option_${num}`]: e.target.value }))}
-                    className={"flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none bg-white " + (qEditData.answer === num ? "border-green-400 focus:border-green-500" : "border-gray-200 focus:border-blue-400")} />
-                </div>
-              ))}
+              {[1, 2, 3, 4].map(num => {
+                const val = qEditData[`option_${num}`] || ""
+                const imgMatch = typeof val === "string" ? val.match(/^!\[[^\]]*\]\(([^)]+)\)$/) : null
+                return (
+                  <div key={num} className={"rounded-lg border p-2 " + (qEditData.answer === num ? "border-green-400 bg-green-50/40" : "border-gray-200 bg-white")}>
+                    <div className="flex items-center gap-2">
+                      <input type="radio" name={`ans_${questionId}`} checked={qEditData.answer === num}
+                        onChange={() => setQEditData((p: any) => ({ ...p, answer: num }))}
+                        className="w-4 h-4 accent-green-600 cursor-pointer flex-shrink-0" title="정답으로 지정" />
+                      <span className="text-sm text-gray-400 flex-shrink-0">{["①", "②", "③", "④"][num - 1]}</span>
+                      <input type="text" value={val}
+                        onChange={e => setQEditData((p: any) => ({ ...p, [`option_${num}`]: e.target.value }))}
+                        placeholder="텍스트 입력 또는 📎로 이미지"
+                        className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                      <label className={"px-2 py-1.5 rounded-lg text-xs font-semibold text-center cursor-pointer flex-shrink-0 " + (optImgUploading === num ? "bg-gray-200 text-gray-400" : "bg-blue-600 text-white hover:bg-blue-700")}>
+                        {optImgUploading === num ? "..." : "📎"}
+                        <input type="file" accept="image/*" className="hidden" disabled={optImgUploading === num}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) uploadOptionImage(num, f) }} />
+                      </label>
+                    </div>
+                    {imgMatch && (
+                      <div className="mt-1 ml-10 flex items-center gap-2">
+                        <img src={imgMatch[1]} alt={`보기${num}`} className="max-h-16 rounded border border-gray-200" />
+                        <button onClick={() => setQEditData((p: any) => ({ ...p, [`option_${num}`]: "" }))}
+                          className="text-xs text-red-500 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50">🗑 텍스트로</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* 이미지 */}
@@ -763,7 +796,8 @@ export default function AdminPage() {
                                 ? "border-green-500 bg-green-50 text-green-700 font-semibold"
                                 : "border-gray-200 bg-white text-gray-600 hover:border-blue-400 hover:bg-blue-50")}>
                               {r.question.answer === num && <span className="mr-1">✅ 현재정답</span>}
-                              {["①", "②", "③", "④"][num - 1]} {r.question[`option_${num}`] || "-"}
+                              <span className="text-gray-400 mr-1">{["①", "②", "③", "④"][num - 1]}</span>
+                              <OptCell text={r.question[`option_${num}`]} />
                             </button>
                           ))}
                         </div>
@@ -1108,4 +1142,12 @@ export default function AdminPage() {
       </div>
     </div>
   )
+}
+
+// 보기 셀: 이미지 마크다운(![](url))이면 이미지로, 아니면 텍스트로 표시
+function OptCell({ text }: { text: string | null | undefined }) {
+  if (!text) return <>-</>
+  const m = typeof text === "string" ? text.match(/^!\[[^\]]*\]\(([^)]+)\)$/) : null
+  if (m) return <img src={m[1]} alt="보기" className="inline-block max-h-12 align-middle" />
+  return <>{text}</>
 }
