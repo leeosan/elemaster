@@ -269,10 +269,13 @@ export default function AdminPage() {
     if (!qEditData) return
     setQImgUploading(true)
     const supabase = createClient()
-    const ext = file.name.split(".").pop() || "png"
+    // 확장자 소문자화 (.PNG → .png), 허용 확장자만 사용
+    let ext = (file.name.split(".").pop() || "png").toLowerCase()
+    if (!["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) ext = "png"
+    // 한글/특수문자 없는 안전한 경로
     const path = `nu_edit_${qEditId}_${Date.now()}.${ext}`
     const { error: upErr } = await supabase.storage.from("exam-images").upload(path, file, {
-      cacheControl: "3600", upsert: true,
+      cacheControl: "3600", upsert: true, contentType: file.type || `image/${ext}`,
     })
     if (upErr) { alert("이미지 업로드 실패: " + upErr.message); setQImgUploading(false); return }
     const { data: pub } = supabase.storage.from("exam-images").getPublicUrl(path)
