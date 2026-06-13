@@ -56,6 +56,13 @@ export default function AdminPage() {
   const [aiEditSaving, setAiEditSaving] = useState(false)
   const [aiEditExists, setAiEditExists] = useState(false)            // 기존 풀이 존재 여부
 
+  // ✏️ 문제(지문/보기/이미지) 편집 상태
+  const [qEditId, setQEditId] = useState<number | null>(null)        // 편집 중인 question_id
+  const [qEditData, setQEditData] = useState<any>(null)              // {question_text, option_1~4, answer, image_url}
+  const [qEditLoading, setQEditLoading] = useState(false)
+  const [qEditSaving, setQEditSaving] = useState(false)
+  const [qImgUploading, setQImgUploading] = useState(false)
+
   const router = useRouter()
 
   useEffect(() => {
@@ -237,6 +244,127 @@ export default function AdminPage() {
                 </button>
               )}
             </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  // ✏️ 문제 편집기 열기 (현재 문제 전체 필드 불러오기)
+  const openQuestionEditor = async (questionId: number) => {
+    if (qEditId === questionId) { setQEditId(null); setQEditData(null); return }
+    setQEditId(questionId)
+    setQEditLoading(true)
+    setQEditData(null)
+    const supabase = createClient()
+    const { data } = await supabase.from("questions")
+      .select("id, question_text, option_1, option_2, option_3, option_4, answer, image_url")
+      .eq("id", questionId).single()
+    setQEditData(data || null)
+    setQEditLoading(false)
+  }
+
+  // ✏️ 이미지 파일 업로드 → exam-images 버킷 → public URL을 image_url에 반영
+  const uploadQuestionImage = async (file: File) => {
+    if (!qEditData) return
+    setQImgUploading(true)
+    const supabase = createClient()
+    const ext = file.name.split(".").pop() || "png"
+    const path = `nu_edit_${qEditId}_${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage.from("exam-images").upload(path, file, {
+      cacheControl: "3600", upsert: true,
+    })
+    if (upErr) { alert("이미지 업로드 실패: " + upErr.message); setQImgUploading(false); return }
+    const { data: pub } = supabase.storage.from("exam-images").getPublicUrl(path)
+    setQEditData((prev: any) => ({ ...prev, image_url: pub.publicUrl }))
+    setQImgUploading(false)
+  }
+
+  // ✏️ 문제 편집 저장
+  const saveQuestionEdit = async () => {
+    if (qEditId === null || !qEditData) return
+    setQEditSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("questions").update({
+      question_text: qEditData.question_text,
+      option_1: qEditData.option_1,
+      option_2: qEditData.option_2,
+      option_3: qEditData.option_3,
+      option_4: qEditData.option_4,
+      answer: qEditData.answer,
+      image_url: qEditData.image_url || null,
+    }).eq("id", qEditId)
+    setQEditSaving(false)
+    if (error) { alert("저장 실패: " + error.message); return }
+    // 화면 상태 동기화
+    setQuestions(prev => prev.map(q => q.id === qEditId ? { ...q, question_text: qEditData.question_text } : q))
+    setReports(prev => prev.map(r => r.question_id === qEditId && r.question
+      ? { ...r, question: { ...r.question, ...qEditData } } : r))
+    alert("문제가 수정되었습니다.")
+  }
+
+  // ✏️ 문제 편집기 공용 렌더링
+  const renderQuestionEditor = (questionId: number) => {
+    if (qEditId !== questionId) return null
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-2">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-blue-700">📝 문제 지문 / 보기 / 이미지 편집</p>
+          <button onClick={() => { setQEditId(null); setQEditData(null) }} className="text-gray-400 text-xl leading-none">×</button>
+        </div>
+        {qEditLoading || !qEditData ? (
+          <p className="text-xs text-gray-400 text-center py-6">불러오는 중...</p>
+        ) : (
+          <>
+            {/* 지문 */}
+            <label className="block text-xs font-semibold text-gray-600 mb-1">문제 지문</label>
+            <textarea value={qEditData.question_text || ""}
+              onChange={e => setQEditData((p: any) => ({ ...p, question_text: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:border-blue-400 bg-white mb-3" rows={3} />
+
+            {/* 보기 1~4 + 정답 라디오 */}
+            <label className="block text-xs font-semibold text-gray-600 mb-1">보기 (왼쪽 ○ = 정답)</label>
+            <div className="space-y-2 mb-3">
+              {[1, 2, 3, 4].map(num => (
+                <div key={num} className="flex items-center gap-2">
+                  <input type="radio" name={`ans_${questionId}`} checked={qEditData.answer === num}
+                    onChange={() => setQEditData((p: any) => ({ ...p, answer: num }))}
+                    className="w-4 h-4 accent-green-600 cursor-pointer flex-shrink-0" title="정답으로 지정" />
+                  <span className="text-sm text-gray-400 flex-shrink-0">{["①", "②", "③", "④"][num - 1]}</span>
+                  <input type="text" value={qEditData[`option_${num}`] || ""}
+                    onChange={e => setQEditData((p: any) => ({ ...p, [`option_${num}`]: e.target.value }))}
+                    className={"flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none bg-white " + (qEditData.answer === num ? "border-green-400 focus:border-green-500" : "border-gray-200 focus:border-blue-400")} />
+                </div>
+              ))}
+            </div>
+
+            {/* 이미지 */}
+            <label className="block text-xs font-semibold text-gray-600 mb-1">문제 이미지</label>
+            {qEditData.image_url ? (
+              <div className="mb-2">
+                <img src={qEditData.image_url} alt="문제 이미지" className="max-w-full rounded-lg border border-gray-200 mb-1" style={{ maxHeight: "160px" }} />
+                <button onClick={() => setQEditData((p: any) => ({ ...p, image_url: "" }))}
+                  className="text-xs text-red-500 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">🗑 이미지 제거</button>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 mb-2">등록된 이미지 없음</p>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
+              <input type="text" value={qEditData.image_url || ""}
+                onChange={e => setQEditData((p: any) => ({ ...p, image_url: e.target.value }))}
+                placeholder="이미지 URL 직접 입력 또는 →"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-blue-400 bg-white" />
+              <label className={"px-3 py-1.5 rounded-lg text-xs font-semibold text-center cursor-pointer flex-shrink-0 " + (qImgUploading ? "bg-gray-200 text-gray-400" : "bg-blue-600 text-white hover:bg-blue-700")}>
+                {qImgUploading ? "업로드 중..." : "📎 파일 업로드"}
+                <input type="file" accept="image/*" className="hidden" disabled={qImgUploading}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadQuestionImage(f) }} />
+              </label>
+            </div>
+
+            <button onClick={saveQuestionEdit} disabled={qEditSaving}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {qEditSaving ? "저장 중..." : "💾 문제 저장"}
+            </button>
           </>
         )}
       </div>
@@ -438,7 +566,7 @@ export default function AdminPage() {
             <th className="px-4 py-3 text-left">문제</th>
             <th className="px-4 py-3 text-center w-24">출제기준변경</th>
             <th className="px-4 py-3 text-center w-28">중요도</th>
-            <th className="px-4 py-3 text-center w-20">AI풀이</th>
+            <th className="px-4 py-3 text-center w-24">편집</th>
             <th className="px-4 py-3 text-center w-16">저장</th>
           </tr>
         </thead>
@@ -465,12 +593,20 @@ export default function AdminPage() {
                   </select>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button onClick={() => openAiEditor(q.id)}
-                    className={"text-xs rounded-lg px-2 py-1 border transition-all " + (aiEditId === q.id
-                      ? "bg-purple-600 text-white border-purple-600"
-                      : "bg-white text-purple-600 border-purple-200 hover:bg-purple-50")}>
-                    {aiEditId === q.id ? "✏️ 편집중" : "✏️ 편집"}
-                  </button>
+                  <div className="flex flex-col gap-1">
+                    <button onClick={() => openQuestionEditor(q.id)}
+                      className={"text-xs rounded-lg px-2 py-1 border transition-all " + (qEditId === q.id
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-blue-600 border-blue-200 hover:bg-blue-50")}>
+                      {qEditId === q.id ? "📝 편집중" : "📝 문제"}
+                    </button>
+                    <button onClick={() => openAiEditor(q.id)}
+                      className={"text-xs rounded-lg px-2 py-1 border transition-all " + (aiEditId === q.id
+                        ? "bg-purple-600 text-white border-purple-600"
+                        : "bg-white text-purple-600 border-purple-200 hover:bg-purple-50")}>
+                      {aiEditId === q.id ? "✏️ 편집중" : "🤖 풀이"}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-center">
                   {saving === q.id ? <span className="text-xs text-blue-500">저장중...</span> : <span className="text-xs text-green-500">✓</span>}
@@ -480,6 +616,13 @@ export default function AdminPage() {
                 <tr>
                   <td colSpan={6} className="px-4 pb-4 bg-purple-50/50">
                     {renderAiEditor(q.id)}
+                  </td>
+                </tr>
+              )}
+              {qEditId === q.id && (
+                <tr>
+                  <td colSpan={6} className="px-4 pb-4 bg-blue-50/50">
+                    {renderQuestionEditor(q.id)}
                   </td>
                 </tr>
               )}
@@ -621,13 +764,22 @@ export default function AdminPage() {
                             </button>
                           ))}
                         </div>
-                        {/* ✏️ AI 풀이 편집 */}
-                        <button onClick={() => openAiEditor(r.question_id)}
-                          className={"mt-2 w-full py-2 rounded-lg text-sm font-semibold border transition-all " + (aiEditId === r.question_id
-                            ? "bg-purple-600 text-white border-purple-600"
-                            : "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100")}>
-                          {aiEditId === r.question_id ? "✏️ AI 풀이 편집 닫기" : "🤖 AI 암기법 & 풀이 편집"}
-                        </button>
+                        {/* ✏️ 문제 편집 + AI 풀이 편집 */}
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => openQuestionEditor(r.question_id)}
+                            className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-all " + (qEditId === r.question_id
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100")}>
+                            {qEditId === r.question_id ? "📝 문제 편집 닫기" : "📝 지문·보기·이미지 편집"}
+                          </button>
+                          <button onClick={() => openAiEditor(r.question_id)}
+                            className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-all " + (aiEditId === r.question_id
+                              ? "bg-purple-600 text-white border-purple-600"
+                              : "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100")}>
+                            {aiEditId === r.question_id ? "✏️ 풀이 편집 닫기" : "🤖 AI 풀이 편집"}
+                          </button>
+                        </div>
+                        {renderQuestionEditor(r.question_id)}
                         {renderAiEditor(r.question_id)}
                       </div>
                     ) : (
