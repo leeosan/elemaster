@@ -38,6 +38,7 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
           <Link href="/cbt/past?exam=1" className="hover:text-blue-600">필기 CBT</Link>
           <Link href="/electrician" className="hover:text-blue-600">전기기능사</Link>
+          <Link href="/sobang" className="hover:text-blue-600">소방기사</Link>
           <Link href="/silgi" className="hover:text-blue-600">실기</Link>
           <Link href="/mypage" className="hover:text-blue-600">나의 학습</Link>
           <Link href="/exam-info" className="hover:text-blue-600">시험정보</Link>
@@ -87,6 +88,7 @@ export default function Header() {
         <div className="md:hidden bg-white border-t px-4 py-3 flex flex-col gap-3 text-sm font-medium text-gray-600">
           <Link href="/cbt/past?exam=1" onClick={() => setMenuOpen(false)}>📝 필기 CBT</Link>
           <Link href="/electrician" onClick={() => setMenuOpen(false)}>⚙️ 전기기능사</Link>
+          <Link href="/sobang" onClick={() => setMenuOpen(false)}>🚒 소방기사</Link>
           <Link href="/silgi" onClick={() => setMenuOpen(false)}>🔧 실기</Link>
           <Link href="/mypage" onClick={() => setMenuOpen(false)}>📊 나의 학습</Link>
           <Link href="/exam-info" onClick={() => setMenuOpen(false)}>ℹ️ 시험정보</Link>
